@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 767968023146.dkr.ecr.us-east-1.amazonaws.com
+  build:
+    commands:
+      - echo Building Docker image...
+      - docker build -t ccc-app .
+      - docker tag ccc-app:latest 767968023146.dkr.ecr.us-east-1.amazonaws.com/ccc-app:latest
+  post_build:
+    commands:
+      - echo Pushing Docker image...
+      - docker push 767968023146.dkr.ecr.us-east-1.amazonaws.com/ccc-app:latest
+      - echo Build completed on `date`

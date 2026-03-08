@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env*
+!.env.production
+*.log
+.DS_Store
+*.pem
+coverage/
+.vercel
+dist/
+build/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+*.tfplan

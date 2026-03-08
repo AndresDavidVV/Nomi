@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo Principal: Empresa (Oferta + Demanda)
+model Empresa {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  nombreLegal   String
+  alias         String?
+  rut           String?  @unique
+  sector        String?
+  ubicacion     String?
+  web           String?
+  
+  // PROPUESTA DE VALOR
+  propuestaValor String?
+  evidenciaDif  String?
+  nit           String?
+  
+  // SEMÁFORO
+  completitud   Int      @default(0)
+  camposFaltantes String   @default("[]")
+  estadoFicha   String   @default("INCOMPLETO")
+
+  // OWNERSHIP
+  creadoPorId   String?
+  creadoPor     User?    @relation(fields: [creadoPorId], references: [id])
+
+  // RELACIONES
+  contactos     Contacto[]
+  reuniones     Reunion[]
+  necesidades   Necesidad[]
+  ofertas       Oferta[]
+  acciones      Accion[]
+}
+
+model Contacto {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id])
+  
+  nombre    String
+  cargo     String?
+  telefono  String?
+  email     String?
+  esDecisor Boolean @default(false)
+  
+  origen    String  @default("MANUAL")
+}
+
+model Necesidad {
+  id             String        @id @default(uuid())
+  empresaId      String
+  empresa        Empresa       @relation(fields: [empresaId], references: [id])
+  
+  enunciado      String
+  categoria      String?
+  urgencia       String?
+  plazo          String?
+  impacto        String?
+  barrera        String?
+  
+  magnitud       Float?
+  proximoPaso    String?
+  responsable    String?
+  fechaEstimada  DateTime?
+  prioridad      String?
+  
+  estado         String        @default("ABIERTO")
+  
+  reuniones      Reunion[]
+  seguimientos   Seguimiento[]
+}
+
+model Oferta {
+  id            String   @id @default(uuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id])
+  
+  capacidad     String
+  target        String?
+  disponibilidad String?
+  evidencia     String?
+  
+  reuniones     Reunion[]
+}
+
+model Reunion {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  
+  fecha       DateTime @default(now())
+  resumen     String
+  audioUrl    String?
+  transcripcion String?
+  
+  necesidades Necesidad[]
+  ofertas     Oferta[]
+}
+
+model Accion {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  
+  descripcion String
+  responsable String?
+  fechaLimite DateTime?
+  estado      String @default("PENDIENTE")
+}
+
+// ── AUTH MODELS ────────────────────────────────────────────────
+
+model User {
+  id            String         @id @default(uuid())
+  phone         String         @unique
+  name          String?
+  email         String?
+  role          String         @default("USER")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  empresas      Empresa[]
+  seguimientos  Seguimiento[]
+  conversations Conversation[]
+  feedbacks     Feedback[]
+}
+
+model OTPCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([phone, expiresAt])
+}
+
+model Seguimiento {
+  id           String    @id @default(uuid())
+  necesidadId  String
+  necesidad    Necesidad @relation(fields: [necesidadId], references: [id])
+  
+  accion       String
+  resultado    String?
+  fecha        DateTime  @default(now())
+  
+  creadoPorId  String?
+  creadoPor    User?     @relation(fields: [creadoPorId], references: [id])
+}
+
+model Conversation {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  
+  title         String    @default("Nueva conversación")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime  @default(now())
+  
+  messages      Message[]
+  
+  @@index([userId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role           String       // 'user' or 'assistant'
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+  
+  @@index([conversationId, createdAt])
+}
+
+model Feedback {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  conversationId String?
+  
+  rating         Int          // 1-5
+  comment        String?      @db.Text
+  status         String       @default("pending")  // pending | reviewed | resolved
+  adminNote      String?      @db.Text              // nota interna de qué se hizo
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  
+  @@index([userId])
+  @@index([rating])
+  @@index([status])
+  @@index([createdAt])
+}

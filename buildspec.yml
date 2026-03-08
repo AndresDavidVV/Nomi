@@ -1,0 +1,31 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 767968023146.dkr.ecr.us-east-1.amazonaws.com/ccc-app
+      - REPOSITORY=767968023146.dkr.ecr.us-east-1.amazonaws.com/ccc-app
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+  
+  build:
+    commands:
+      - echo Build started on $(date)
+      - cd web-app
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY:latest .
+      - docker tag $REPOSITORY:latest $REPOSITORY:$IMAGE_TAG
+  
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY:latest
+      - docker push $REPOSITORY:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '{"ImageURI":"%s"}' $REPOSITORY:latest > imageDetail.json
+      
+artifacts:
+  files:
+    - imageDetail.json
+  discard-paths: yes

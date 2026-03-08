@@ -1,0 +1,6 @@
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+codebuild-project.json
+*.tfstate
+*.tfstate.backup

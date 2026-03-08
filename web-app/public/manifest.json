@@ -1,0 +1,17 @@
+{
+  "name": "CCC Inteligencia Económica",
+  "short_name": "CCC Intel",
+  "description": "Agente de Campo - Cámara de Comercio de Cali",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#233B85",
+  "theme_color": "#233B85",
+  "icons": [
+    {
+      "src": "/ccc-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-03-04T14:40:00Z",
+  "subagent": "ccc-mejoras-1-5",
+  "status": "COMPLETADO",
+  "mejoras_implementadas": [
+    {
+      "id": 1,
+      "nombre": "Flexibilizar el guardián de datos",
+      "estado": "✅ COMPLETADO",
+      "detalles": [
+        "Actualizado SYSTEM_PROMPT en route.ts",
+        "Eliminadas reglas bloqueantes sobre campos obligatorios",
+        "Ahora acepta info parcial: solo necesita nombre empresa + razón/insight",
+        "IA conversacional, no interrogatorio",
+        "Respeta decisión del usuario si dice 'guárdalo así'"
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Sección 'Mis Empresas' en Dashboard",
+      "estado": "✅ COMPLETADO",
+      "detalles": [
+        "Agregada función getMisEmpresas() en actions.ts",
+        "Nueva sección en dashboard con lista expandible",
+        "Muestra: nombre, sector, completitud (%), # necesidades, # ofertas, # contactos",
+        "Click expande/colapsa para ver detalle completo",
+        "Detalle incluye: propuesta de valor, contactos, necesidades, ofertas"
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Exportar CSV desde Dashboard",
+      "estado": "✅ COMPLETADO",
+      "detalles": [
+        "Botón '📥 Exportar CSV' en sección Mis Empresas",
+        "Exporta todas las empresas del usuario",
+        "Campos: nombre, sector, completitud, necesidades, ofertas, contactos, propuesta de valor",
+        "Generación client-side con descarga automática"
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Micrófono tipo WhatsApp (press & hold)",
+      "estado": "✅ COMPLETADO",
+      "detalles": [
+        "Cambiado de toggle a press-and-hold",
+        "onMouseDown/onTouchStart → inicia grabación",
+        "onMouseUp/onTouchEnd → detiene y transcribe",
+        "Indicador visual rojo pulsante mientras graba",
+        "Ignora taps accidentales (< 500ms)"
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Categorías 3i en necesidades",
+      "estado": "✅ COMPLETADO",
+      "detalles": [
+        "Agregado campo 'categoria' en tool guardarNecesidad",
+        "4 categorías: Inversión, Innovación, Internacionalización, General",
+        "IA clasifica automáticamente según contexto",
+        "Instrucciones en SYSTEM_PROMPT para clasificación estratégica",
+        "Campo visible en Dashboard (badge morado)",
+        "Actualizada función actualizarNecesidadDB para soportar categoria"
+      ]
+    }
+  ],
+  "deploy": {
+    "git_commit": "8e1ba07",
+    "docker_image": "767968023146.dkr.ecr.us-east-1.amazonaws.com/ccc-app:latest",
+    "ecs_service": "ccc-service",
+    "deploy_time": "~14:36 UTC",
+    "health_check": "✅ OK (https://ccc.lidarit.com/api/health)"
+  },
+  "testing": {
+    "build": "✅ Compiló sin errores",
+    "frontend_load": "✅ Página de login carga correctamente",
+    "login_required": "⚠️ No se pudo probar flujos completos (requiere OTP por WhatsApp)",
+    "nota": "Para testing completo, necesitas loguearte con +573176677225 y proporcionar el código OTP que llegará por WhatsApp"
+  },
+  "pendiente": [],
+  "notas": [
+    "Todas las 5 mejoras están implementadas y desplegadas en producción",
+    "El código compila sin errores y el servicio está activo",
+    "Para testing manual: https://ccc.lidarit.com",
+    "Los cambios mejoran significativamente la UX al hacer el sistema más flexible y conversacional"
+  ]
+}
