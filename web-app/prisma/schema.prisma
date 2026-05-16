@@ -7,28 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Modelo Principal: Empresa (Oferta + Demanda)
-model Empresa {
+// ── MODELO DVA: Descubrir · Validar · Activar ─────────────────
+
+// Miembro del equipo Nomi (perfil extendido del User)
+model TeamMember {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  rol       String   // EQUIPO_COMERCIAL, INVERSIONISTA, ALIADO_ESTRATEGICO, EQUIPO_INTERNO
+  aporte    String?  // Cómo puede aportar al crecimiento de Nomi
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  oportunidades Oportunidad[]
+}
+
+// Establecimiento (restaurante, bar, hotel, etc.)
+model Establecimiento {
   id            String   @id @default(uuid())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
-  nombreLegal   String
-  alias         String?
-  rut           String?  @unique
-  sector        String?
-  ubicacion     String?
-  web           String?
+  nombre        String
+  tipo          String   // RESTAURANTE, CLUB, HOTEL, BAR, EXPERIENCIA_TURISTICA, OTRO
+  tipoOtro      String?  // Si tipo es OTRO
+  pais          String?
+  ciudad        String?
+  tamano        String?  // Tamaño aproximado
   
-  // PROPUESTA DE VALOR
-  propuestaValor String?
-  evidenciaDif  String?
-  nit           String?
-  
-  // SEMÁFORO
+  // SEMÁFORO de completitud
   completitud   Int      @default(0)
-  camposFaltantes String   @default("[]")
-  estadoFicha   String   @default("INCOMPLETO")
+  estadoFicha   String   @default("DESCUBRIR")  // DESCUBRIR, VALIDAR, ACTIVAR, CERRADO
 
   // OWNERSHIP
   creadoPorId   String?
@@ -36,86 +47,87 @@ model Empresa {
 
   // RELACIONES
   contactos     Contacto[]
-  reuniones     Reunion[]
-  necesidades   Necesidad[]
-  ofertas       Oferta[]
-  acciones      Accion[]
+  oportunidades Oportunidad[]
 }
 
+// Contacto dentro del establecimiento
 model Contacto {
-  id        String  @id @default(uuid())
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id])
+  id                String          @id @default(uuid())
+  establecimientoId String
+  establecimiento   Establecimiento @relation(fields: [establecimientoId], references: [id])
   
-  nombre    String
-  cargo     String?
-  telefono  String?
-  email     String?
-  esDecisor Boolean @default(false)
+  nombre            String
+  cargo             String?
+  telefono          String?
+  email             String?
+  esDecisor         Boolean         @default(false)  // ¿Toma decisiones de tecnología?
   
-  origen    String  @default("MANUAL")
+  createdAt         DateTime        @default(now())
 }
 
-model Necesidad {
-  id             String        @id @default(uuid())
-  empresaId      String
-  empresa        Empresa       @relation(fields: [empresaId], references: [id])
+// Oportunidad (el corazón del funnel DVA)
+model Oportunidad {
+  id                String          @id @default(uuid())
+  establecimientoId String
+  establecimiento   Establecimiento @relation(fields: [establecimientoId], references: [id])
   
-  enunciado      String
-  categoria      String?
-  urgencia       String?
-  plazo          String?
-  impacto        String?
-  barrera        String?
+  // Quién registró esta oportunidad
+  registradoPorId   String?
+  registradoPor     TeamMember?     @relation(fields: [registradoPorId], references: [id])
   
-  magnitud       Float?
-  proximoPaso    String?
-  responsable    String?
-  fechaEstimada  DateTime?
-  prioridad      String?
+  // ── ETAPA 1: DESCUBRIR ──
+  comoConocio       String?  // REFERIDO, VISITA, SOCIO, EVENTO, INVESTIGACION, OTRO
+  hipotesisValor    String?  // Cómo crees que Nomi podría encajar aquí
+  nivelPotencial    String?  // ALTO, MEDIO, BAJO
   
-  estado         String        @default("ABIERTO")
+  // ── ETAPA 2: VALIDAR ──
+  pedidosMes        Int?     // Pedidos aproximados por mes
+  puntoExigente     String?  // Qué parte del servicio es más compleja
+  valorNomi         String?  // Dónde Nomi aporta más valor
+  nivelInteres      String?  // ALTO, MEDIO, BAJO
   
-  reuniones      Reunion[]
-  seguimientos   Seguimiento[]
+  // ── ETAPA 3: ACTIVAR ──
+  confirmacionInteres String?  // SI_AVANZAR, INTERES_ALTO_REVISANDO, INTERES_MEDIO, NO_POR_AHORA
+  siguientePaso       String?  // REUNION_TECNICA, REVISION_COMERCIAL, PRESENTACION_JUNTA, DEFINICION_FECHAS
+  
+  // Propuesta comercial
+  valorPropuesto      String?
+  alcanceImplementacion String?
+  condiciones         String?
+  
+  // Negociación
+  fechaSeguimiento    DateTime?
+  comentariosCliente  String?
+  ajustesSolicitados  String?
+  probabilidadCierre  String?  // ALTA, MEDIA, BAJA
+  
+  // Cierre
+  resultadoFinal      String?  // VENTA_CERRADA, EN_PAUSA, DESCARTADA
+  
+  // Estado general del funnel
+  etapaActual         String   @default("DESCUBRIR")  // DESCUBRIR, VALIDAR, ACTIVAR, CERRADO
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  seguimientos        Seguimiento[]
+  
+  @@index([etapaActual])
+  @@index([establecimientoId])
 }
 
-model Oferta {
-  id            String   @id @default(uuid())
-  empresaId     String
-  empresa       Empresa  @relation(fields: [empresaId], references: [id])
+// Seguimiento de una oportunidad
+model Seguimiento {
+  id             String      @id @default(uuid())
+  oportunidadId  String
+  oportunidad    Oportunidad @relation(fields: [oportunidadId], references: [id])
   
-  capacidad     String
-  target        String?
-  disponibilidad String?
-  evidencia     String?
+  accion         String
+  resultado      String?
+  fecha          DateTime    @default(now())
   
-  reuniones     Reunion[]
-}
-
-model Reunion {
-  id          String   @id @default(uuid())
-  empresaId   String
-  empresa     Empresa  @relation(fields: [empresaId], references: [id])
-  
-  fecha       DateTime @default(now())
-  resumen     String
-  audioUrl    String?
-  transcripcion String?
-  
-  necesidades Necesidad[]
-  ofertas     Oferta[]
-}
-
-model Accion {
-  id          String   @id @default(uuid())
-  empresaId   String
-  empresa     Empresa  @relation(fields: [empresaId], references: [id])
-  
-  descripcion String
-  responsable String?
-  fechaLimite DateTime?
-  estado      String @default("PENDIENTE")
+  creadoPorId    String?
+  creadoPor      User?       @relation(fields: [creadoPorId], references: [id])
 }
 
 // ── AUTH MODELS ────────────────────────────────────────────────
@@ -125,11 +137,12 @@ model User {
   phone         String         @unique
   name          String?
   email         String?
-  role          String         @default("USER")
+  role          String         @default("USER")  // USER, ADMIN
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   
-  empresas      Empresa[]
+  teamMember    TeamMember?
+  establecimientos Establecimiento[]
   seguimientos  Seguimiento[]
   conversations Conversation[]
   feedbacks     Feedback[]
@@ -145,18 +158,7 @@ model OTPCode {
   @@index([phone, expiresAt])
 }
 
-model Seguimiento {
-  id           String    @id @default(uuid())
-  necesidadId  String
-  necesidad    Necesidad @relation(fields: [necesidadId], references: [id])
-  
-  accion       String
-  resultado    String?
-  fecha        DateTime  @default(now())
-  
-  creadoPorId  String?
-  creadoPor    User?     @relation(fields: [creadoPorId], references: [id])
-}
+// ── CONVERSATION MODELS ────────────────────────────────────────
 
 model Conversation {
   id            String    @id @default(uuid())
@@ -193,8 +195,8 @@ model Feedback {
   
   rating         Int          // 1-5
   comment        String?      @db.Text
-  status         String       @default("pending")  // pending | reviewed | resolved
-  adminNote      String?      @db.Text              // nota interna de qué se hizo
+  status         String       @default("pending")
+  adminNote      String?      @db.Text
   resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
   

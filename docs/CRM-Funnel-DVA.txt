@@ -1,0 +1,136 @@
+﻿El Modelo DVA de Nomi
+Descubrir · Validar · Activar
+El Modelo DVA de Nomi es la metodología utilizada para identificar, evaluar y activar oportunidades donde Nomi puede generar valor.
+Este modelo permite que todo los involucrados con Nomi —equipo comercial, inversionistas, aliados y socios— puedan participar en la detección y desarrollo de oportunidades de forma estructurada.
+El proceso se compone de tres etapas principales:
+1. Descubrir – Identificar oportunidades potenciales
+2. Validar – Confirmar si Nomi realmente aporta valor
+3. Activar – Iniciar el proceso de implementación y venta
+
+
+Registro inicial del miembro del equipo
+Antes de registrar oportunidades, cada miembro del ecosistema Nomi debe crear su perfil para identificar cómo participa en la expansión del proyecto.
+Información solicitada
+1. Nombre completo
+2. Rol dentro de Nomi
+Opciones:
+* Equipo comercial
+* Inversionista
+* Aliado estratégico
+* Equipo interno
+3. ¿Cómo puedes aportar al crecimiento de Nomi?
+Opciones:
+* Detectando establecimientos potenciales
+* Generando contactos con gerentes o dueños
+* Apoyando el proceso comercial
+* Apoyando expansión en mi país
+Etapa 1 — DESCUBRIR
+Identificar si vale la pena explorar una oportunidad
+Preguntas
+1. Nombre del establecimiento
+2. Tipo de establecimiento
+Opciones:
+* Restaurante
+* Club
+* Hotel
+* Bar
+* Experiencia turística
+* Otro (¿Cuál?)
+
+3. País
+4. Ciudad
+5. ¿Cómo conociste este establecimiento?
+Opciones:
+   * Referido
+   * Visita
+   * Socio
+   * Evento
+   * Investigación
+   * Otro
+
+6. Tamaño aproximado del establecimiento
+7. ¿Cómo crees que Nomi podría encajar aquí?
+Este campo permite registrar una hipótesis inicial sobre el valor que Nomi podría generar.
+8. ¿Existe un contacto dentro del establecimiento?
+Opciones:
+      * Sí
+      * No
+
+Si la respuesta es sí, registrar:
+Nombre
+Cargo
+Teléfono o correo
+
+9. Nivel inicial de potencial
+Opciones:
+         * Alto
+         * Medio
+         * Bajo
+Etapa 2 — VALIDAR
+1. ¿Cuántos pedidos aproximados atienden por mes?
+Este dato ayuda a entender el volumen operativo del establecimiento.
+2. ¿Qué parte del servicio parece más exigente o compleja?
+Opciones:
+         * Tomar los pedidos
+         * Explicar el menú
+         * Desplazamiento de meseros
+         * Envío de pedidos a cocina
+         * Atención a muchos clientes al mismo tiempo
+         * Otro (¿Cuál?)
+3. ¿Quién toma la decisión sobre tecnología o innovación en el establecimiento?
+Registrar:
+         * Nombre
+         * Cargo
+
+
+4. ¿Dónde imaginas que Nomi podría aportar más valor aquí?
+Opciones:
+         * Toma de pedidos
+         * Explicación del menú
+         * Atención simultánea a múltiples mesas
+         * Atención a clientes internacionales
+         * Apoyo en eventos
+         * Capacitación de personal
+         * Otro
+5. Nivel de interés del establecimiento
+Opciones:
+         * Alto
+         * Medio
+         * Bajo
+
+Etapa 3 — ACTIVAR
+1. Confirmación de interés
+¿El establecimiento ve valor en implementar Nomi?
+Opciones:
+            * Sí, quieren avanzar
+            * Interés alto, revisando condiciones
+            * Interés medio
+            * No por ahora
+2. Responsable dentro del establecimiento (persona que liderará el proceso interno.)
+            * Nombre
+            * Cargo
+
+
+3. ¿Cuál es el siguiente paso acordado?
+            * Reunión técnica
+            * Revisión comercial
+            * Presentación a la junta
+            * Definición de fechas
+4. Propuesta
+Registrar los elementos de la propuesta comercial.
+            * Valor propuesto
+            * Alcance de implementación
+            * Condiciones
+5. Negociación / ajustes
+Registrar:
+            * Fecha de seguimiento
+            * Comentarios del cliente
+            * Ajustes solicitados
+            * Probabilidad de cierre
+6. Cierre
+Resultado final de la oportunidad.
+Opciones:
+            * Venta cerrada
+            * En pausa
+            * Oportunidad descartada
+7. IMPLEMENTACIÓN

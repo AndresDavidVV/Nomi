@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const key = url.searchParams.get('key');
 
-  if (key !== 'ccc-admin-2026-stats') {
+  if (key !== 'nomi-admin-2026') {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

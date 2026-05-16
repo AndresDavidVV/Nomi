@@ -5,7 +5,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
   
-  if (key !== 'ccc-admin-2026-stats') {
+  if (key !== 'nomi-admin-2026') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

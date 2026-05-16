@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Inteligencia Económica | Cámara de Comercio de Cali",
-  description: "Plataforma de Inteligencia Económica - Agente de Campo IA",
+  title: "Nomi | CRM de Restaurantes",
+  description: "Plataforma CRM para establecimientos gastronómicos - Modelo DVA",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "CCC Intel",
+    title: "Nomi CRM",
   },
 };
 
@@ -18,7 +18,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#233B85",
+  themeColor: "#4A3F2F",
 };
 
 export default function RootLayout({

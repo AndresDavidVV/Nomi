@@ -161,7 +161,7 @@ export default function ConversationSidebar({
                 onClose();
               }
             }}
-            className="w-full px-4 py-3 bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white rounded-lg font-medium shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white rounded-lg font-medium shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -201,7 +201,7 @@ export default function ConversationSidebar({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className={`text-sm font-medium truncate ${
-                        activeConversationId === conv.id ? 'text-[#233B85]' : 'text-slate-800'
+                        activeConversationId === conv.id ? 'text-[#4A3F2F]' : 'text-slate-800'
                       }`}>
                         {conv.title}
                       </p>

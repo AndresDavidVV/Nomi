@@ -5,34 +5,89 @@ import { getSession } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-// ── Seguimiento CRUD ──────────────────────────────────────────
+// ── Pipeline Metrics (DVA) ─────────────────────────────────────
 
-export async function crearSeguimiento(necesidadId: string, accion: string, resultado?: string) {
-  const session = await getSession();
-  if (!session) throw new Error('No autenticado');
+export async function getPipelineMetrics() {
+  const establecimientos = await prisma.establecimiento.findMany({
+    include: { oportunidades: true },
+  });
 
-  return await prisma.seguimiento.create({
-    data: {
-      necesidadId,
-      accion,
-      resultado: resultado || null,
-      creadoPorId: session.id,
-    },
+  const todasOportunidades = establecimientos.flatMap(e => e.oportunidades);
+
+  const porEtapa = todasOportunidades.reduce((acc: any, o) => {
+    acc[o.etapaActual] = (acc[o.etapaActual] || 0) + 1;
+    return acc;
+  }, {});
+
+  const porTipo = establecimientos.reduce((acc: any, e) => {
+    acc[e.tipo] = (acc[e.tipo] || 0) + 1;
+    return acc;
+  }, {});
+
+  const porNivelInteres = todasOportunidades.reduce((acc: any, o) => {
+    const nivel = o.nivelInteres || 'sin_dato';
+    acc[nivel] = (acc[nivel] || 0) + 1;
+    return acc;
+  }, {});
+
+  const porResultado = todasOportunidades
+    .filter(o => o.resultadoFinal)
+    .reduce((acc: any, o) => {
+      acc[o.resultadoFinal!] = (acc[o.resultadoFinal!] || 0) + 1;
+      return acc;
+    }, {});
+
+  return {
+    totalEstablecimientos: establecimientos.length,
+    totalOportunidades: todasOportunidades.length,
+    porEtapa,
+    porTipo,
+    porNivelInteres,
+    porResultado,
+  };
+}
+
+// ── Establecimientos ───────────────────────────────────────────
+
+export async function getEstablecimientos() {
+  return await prisma.establecimiento.findMany({
+    orderBy: { updatedAt: 'desc' },
     include: {
-      necesidad: {
-        include: {
-          empresa: true,
-        },
+      contactos: true,
+      oportunidades: true,
+      creadoPor: { select: { name: true, phone: true } },
+    },
+  });
+}
+
+// ── Oportunidades por Etapa ────────────────────────────────────
+
+export async function getOportunidadesPorEtapa(etapa: string) {
+  return await prisma.oportunidad.findMany({
+    where: { etapaActual: etapa },
+    orderBy: { updatedAt: 'desc' },
+    include: {
+      establecimiento: {
+        select: { nombre: true, tipo: true, ciudad: true, pais: true },
       },
     },
   });
 }
 
-export async function obtenerSeguimientos(necesidadId: string) {
+// ── Seguimientos Recientes ─────────────────────────────────────
+
+export async function obtenerSeguimientosRecientes(limit = 10) {
   return await prisma.seguimiento.findMany({
-    where: { necesidadId },
+    take: limit,
     orderBy: { fecha: 'desc' },
     include: {
+      oportunidad: {
+        include: {
+          establecimiento: {
+            select: { nombre: true },
+          },
+        },
+      },
       creadoPor: {
         select: { name: true },
       },
@@ -40,280 +95,45 @@ export async function obtenerSeguimientos(necesidadId: string) {
   });
 }
 
-export async function obtenerSeguimientosRecientes(userId: string, limit = 10) {
-  return await prisma.seguimiento.findMany({
-    where: {
-      creadoPorId: userId,
-    },
-    take: limit,
-    orderBy: { fecha: 'desc' },
-    include: {
-      necesidad: {
-        include: {
-          empresa: {
-            select: { nombreLegal: true },
-          },
-        },
-      },
-    },
-  });
-}
+// ── Oportunidades próximas a seguimiento ───────────────────────
 
-// ── Analytics Queries ──────────────────────────────────────────
-
-export async function getPortfolioMetrics(_userId: string) {
-  // Cross-user: all empresas visible to everyone
-  const empresas = await prisma.empresa.findMany({
-    include: {
-      necesidades: true,
-    },
-  });
-
-  const todasNecesidades = empresas.flatMap(e => e.necesidades);
-
-  // Total valor de problemas
-  const valorTotal = todasNecesidades.reduce((sum, n) => sum + (n.magnitud || 0), 0);
-
-  // Por estado
-  const porEstado = todasNecesidades.reduce((acc: any, n) => {
-    acc[n.estado] = (acc[n.estado] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Por prioridad
-  const porPrioridad = todasNecesidades.reduce((acc: any, n) => {
-    const p = n.prioridad || 'sin_asignar';
-    acc[p] = (acc[p] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Valor por prioridad
-  const valorPorPrioridad = todasNecesidades.reduce((acc: any, n) => {
-    const p = n.prioridad || 'sin_asignar';
-    acc[p] = (acc[p] || 0) + (n.magnitud || 0);
-    return acc;
-  }, {});
-
-  // Calcular completitud promedio de todas las empresas
-  const completitudPromedio = empresas.length > 0
-    ? empresas.reduce((sum, e) => sum + e.completitud, 0) / empresas.length
-    : 0;
-
-  return {
-    totalEmpresas: empresas.length,
-    totalNecesidades: todasNecesidades.length,
-    valorTotal,
-    completitudPromedio: Math.round(completitudPromedio),
-    porEstado,
-    porPrioridad,
-    valorPorPrioridad,
-  };
-}
-
-export async function getEmpresaMetrics(empresaId: string) {
-  const empresa = await prisma.empresa.findUnique({
-    where: { id: empresaId },
-    include: {
-      necesidades: true,
-      ofertas: true,
-      contactos: true,
-    },
-  });
-
-  if (!empresa) return null;
-
-  const valorTotal = empresa.necesidades.reduce((sum, n) => sum + (n.magnitud || 0), 0);
-  
-  const porEstado = empresa.necesidades.reduce((acc: any, n) => {
-    acc[n.estado] = (acc[n.estado] || 0) + 1;
-    return acc;
-  }, {});
-
-  const porPrioridad = empresa.necesidades.reduce((acc: any, n) => {
-    const p = n.prioridad || 'sin_asignar';
-    acc[p] = (acc[p] || 0) + 1;
-    return acc;
-  }, {});
-
-  return {
-    empresa: {
-      nombreLegal: empresa.nombreLegal,
-      sector: empresa.sector,
-      propuestaValor: empresa.propuestaValor,
-    },
-    totalNecesidades: empresa.necesidades.length,
-    totalOfertas: empresa.ofertas.length,
-    totalContactos: empresa.contactos.length,
-    valorTotal,
-    porEstado,
-    porPrioridad,
-  };
-}
-
-export async function getNecesidadesPorEstado(_userId: string) {
-  const necesidades = await prisma.necesidad.findMany({
-    include: {
-      empresa: {
-        select: { nombreLegal: true },
-      },
-    },
-  });
-
-  const agrupadas = necesidades.reduce((acc: any, n) => {
-    if (!acc[n.estado]) acc[n.estado] = [];
-    acc[n.estado].push(n);
-    return acc;
-  }, {});
-
-  return agrupadas;
-}
-
-export async function getTopNecesidades(_userId: string, limit = 10) {
-  return await prisma.necesidad.findMany({
-    where: {
-      magnitud: {
-        not: null,
-      },
-    },
-    orderBy: {
-      magnitud: 'desc',
-    },
-    take: limit,
-    include: {
-      empresa: {
-        select: { nombreLegal: true },
-      },
-    },
-  });
-}
-
-export async function getNecesidadesVencidas(_userId: string) {
-  const ahora = new Date();
-
-  return await prisma.necesidad.findMany({
-    where: {
-      fechaEstimada: {
-        lt: ahora,
-      },
-      estado: {
-        not: 'RESUELTO',
-      },
-    },
-    orderBy: {
-      fechaEstimada: 'asc',
-    },
-    include: {
-      empresa: {
-        select: { nombreLegal: true },
-      },
-    },
-  });
-}
-
-export async function getProximasAcciones(_userId: string, dias = 7) {
+export async function getProximosSeguimientos(dias = 7) {
   const ahora = new Date();
   const limite = new Date();
   limite.setDate(limite.getDate() + dias);
 
-  return await prisma.necesidad.findMany({
+  return await prisma.oportunidad.findMany({
     where: {
-      fechaEstimada: {
+      fechaSeguimiento: {
         gte: ahora,
         lte: limite,
       },
-      estado: {
-        not: 'RESUELTO',
-      },
+      etapaActual: { not: 'CERRADO' },
     },
-    orderBy: {
-      fechaEstimada: 'asc',
-    },
+    orderBy: { fechaSeguimiento: 'asc' },
     include: {
-      empresa: {
-        select: { nombreLegal: true },
+      establecimiento: {
+        select: { nombre: true, tipo: true, ciudad: true },
       },
     },
   });
 }
 
-// ── Acciones Pendientes (for dashboard) ───────────────────────
+// ── Oportunidades vencidas (seguimiento pasado) ────────────────
 
-export async function getAccionesPendientes(filters: { 
-  orderBy?: 'impact' | 'urgency' | 'deadline';
-  responsable?: string;
-  limit?: number;
-} = {}) {
-  const where: any = {
-    responsable: { not: null },
-    estado: { not: 'RESUELTO' },
-  };
+export async function getOportunidadesVencidas() {
+  const ahora = new Date();
 
-  if (filters.responsable) {
-    where.responsable = { contains: filters.responsable, mode: 'insensitive' };
-  }
-
-  let orderBy: any;
-  switch (filters.orderBy) {
-    case 'impact':
-      orderBy = { magnitud: 'desc' };
-      break;
-    case 'urgency':
-      orderBy = [{ prioridad: 'asc' }, { fechaEstimada: 'asc' }];
-      break;
-    case 'deadline':
-    default:
-      orderBy = { fechaEstimada: 'asc' };
-      break;
-  }
-
-  return await prisma.necesidad.findMany({
-    where,
-    orderBy,
-    take: filters.limit || 50,
-    include: {
-      empresa: {
-        select: { nombreLegal: true },
-      },
-    },
-  });
-}
-
-// Group acciones by responsable for dashboard view
-export async function getAccionesPorResponsable() {
-  const acciones = await prisma.necesidad.findMany({
+  return await prisma.oportunidad.findMany({
     where: {
-      responsable: { not: null },
-      estado: { not: 'RESUELTO' },
+      fechaSeguimiento: { lt: ahora },
+      etapaActual: { not: 'CERRADO' },
     },
-    orderBy: { fechaEstimada: 'asc' },
+    orderBy: { fechaSeguimiento: 'asc' },
     include: {
-      empresa: {
-        select: { nombreLegal: true },
+      establecimiento: {
+        select: { nombre: true, tipo: true, ciudad: true },
       },
-    },
-  });
-
-  // Group by responsable
-  const grouped: Record<string, any[]> = {};
-  for (const a of acciones) {
-    const resp = a.responsable || 'Sin asignar';
-    if (!grouped[resp]) grouped[resp] = [];
-    grouped[resp].push(a);
-  }
-
-  return grouped;
-}
-
-export async function getMisEmpresas(_userId: string) {
-  // Cross-user: all empresas visible to everyone
-  return await prisma.empresa.findMany({
-    orderBy: {
-      updatedAt: 'desc',
-    },
-    include: {
-      necesidades: true,
-      ofertas: true,
-      contactos: true,
     },
   });
 }

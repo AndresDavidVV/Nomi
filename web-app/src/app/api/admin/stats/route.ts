@@ -2,13 +2,12 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// GET /api/admin/stats?key=<secret> - Quick stats (no auth required, uses API key)
+// GET /api/admin/stats?key=<secret>
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const key = url.searchParams.get('key');
   
-  // Simple API key protection
-  if (key !== 'ccc-admin-2026-stats') {
+  if (key !== 'nomi-admin-2026') {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -31,11 +30,15 @@ export async function GET(req: Request) {
 
     const totalMsgs = await prisma.message.count();
 
-    const empresasReales = await prisma.empresa.count({
-      where: { NOT: { id: { startsWith: 'seed-' } } },
-    });
+    const totalEstablecimientos = await prisma.establecimiento.count();
 
-    const totalEmpresas = await prisma.empresa.count();
+    const totalOportunidades = await prisma.oportunidad.count();
+
+    // Pipeline by stage
+    const oportunidadesPorEtapa = await prisma.oportunidad.groupBy({
+      by: ['etapaActual'],
+      _count: true,
+    });
 
     // Feedback
     let feedbacks: any[] = [];
@@ -52,8 +55,12 @@ export async function GET(req: Request) {
       convsWithMsgs,
       emptyConvs,
       totalMsgs,
-      empresasReales,
-      totalEmpresas,
+      totalEstablecimientos,
+      totalOportunidades,
+      pipeline: oportunidadesPorEtapa.reduce((acc: any, g: any) => {
+        acc[g.etapaActual] = g._count;
+        return acc;
+      }, {}),
       feedbacks,
     }, null, 2), {
       headers: { 'Content-Type': 'application/json' },

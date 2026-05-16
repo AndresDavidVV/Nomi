@@ -17,29 +17,26 @@ async function ensurePgTrgm() {
     await query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
     pgTrgmInitialized = true;
   } catch (e) {
-    // Extension might already exist or user lacks permission — try using it anyway
     pgTrgmInitialized = true;
   }
 }
 
-// ── DB Operations ──────────────────────────────────────────────
+// ── DB Operations (Modelo DVA) ─────────────────────────────────
 
-async function buscarEmpresaDB(search: string, _userId?: string) {
+async function buscarEstablecimientoDB(search: string) {
   if (!search) return [];
   await ensurePgTrgm();
   
-  // Fuzzy search using pg_trgm similarity — cross-user visibility (no creadoPorId filter)
   const results = await query(
     `SELECT *, 
        GREATEST(
-         similarity("nombreLegal", $1),
-         similarity(COALESCE("alias",''), $1)
+         similarity("nombre", $1),
+         COALESCE(similarity("ciudad",''), 0)
        ) AS sim
-     FROM "Empresa"
-     WHERE "nombreLegal" ILIKE $2 
-        OR "alias" ILIKE $2
-        OR similarity("nombreLegal", $1) > 0.25
-        OR similarity(COALESCE("alias",''), $1) > 0.25
+     FROM "Establecimiento"
+     WHERE "nombre" ILIKE $2 
+        OR "ciudad" ILIKE $2
+        OR similarity("nombre", $1) > 0.25
      ORDER BY sim DESC
      LIMIT 10`,
     [search, `%${search}%`]
@@ -47,277 +44,166 @@ async function buscarEmpresaDB(search: string, _userId?: string) {
   return results;
 }
 
-async function crearEmpresaDB(nombre: string, userId?: string, sector?: string) {
+async function crearEstablecimientoDB(nombre: string, tipo: string, userId?: string, pais?: string, ciudad?: string, tamano?: string, tipoOtro?: string) {
   await ensurePgTrgm();
   
-  // Dedup: check for similar empresa before creating
+  // Dedup check
   const similar = await query(
-    `SELECT *, similarity("nombreLegal", $1) AS sim
-     FROM "Empresa"
-     WHERE similarity("nombreLegal", $1) > 0.4
+    `SELECT *, similarity("nombre", $1) AS sim
+     FROM "Establecimiento"
+     WHERE similarity("nombre", $1) > 0.4
      ORDER BY sim DESC LIMIT 1`,
     [nombre]
   );
   
   if (similar.length > 0) {
     const existing = similar[0];
-    // If new sector provided and different from existing, append it
-    if (sector && existing.sector && !existing.sector.toLowerCase().includes(sector.toLowerCase())) {
-      const newSector = `${existing.sector}, ${sector}`;
-      await query(
-        `UPDATE "Empresa" SET "sector"=$1, "updatedAt"=$2 WHERE "id"=$3`,
-        [newSector, new Date().toISOString(), existing.id]
-      );
-      return { 
-        id: existing.id, 
-        nombreLegal: existing.nombreLegal, 
-        sector: newSector, 
-        completitud: existing.completitud,
-        action: 'EXISTING_UPDATED',
-        message: `Empresa "${existing.nombreLegal}" ya existía (similitud ${(existing.sim * 100).toFixed(0)}%). Se agregó sector "${sector}".`
-      };
-    }
     return { 
       id: existing.id, 
-      nombreLegal: existing.nombreLegal, 
-      sector: existing.sector, 
-      completitud: existing.completitud,
+      nombre: existing.nombre, 
+      tipo: existing.tipo,
       action: 'ALREADY_EXISTS',
-      message: `Empresa "${existing.nombreLegal}" ya existe (similitud ${(existing.sim * 100).toFixed(0)}%). Usa empresaId="${existing.id}" para agregar información.`
+      message: `Establecimiento "${existing.nombre}" ya existe (similitud ${(existing.sim * 100).toFixed(0)}%). Usa establecimientoId="${existing.id}".`
     };
   }
   
   const id = randomUUID();
   const now = new Date().toISOString();
   await query(
-    `INSERT INTO "Empresa" ("id","createdAt","updatedAt","nombreLegal","sector","camposFaltantes","completitud","estadoFicha","creadoPorId") VALUES ($1,$2,$2,$3,$4,$5,0,'INCOMPLETO',$6)`,
-    [id, now, nombre, sector || null, JSON.stringify(["contacto", "necesidad", "oferta", "diferenciador"]), userId || null]
+    `INSERT INTO "Establecimiento" ("id","createdAt","updatedAt","nombre","tipo","tipoOtro","pais","ciudad","tamano","completitud","estadoFicha","creadoPorId") 
+     VALUES ($1,$2,$2,$3,$4,$5,$6,$7,$8,0,'DESCUBRIR',$9)`,
+    [id, now, nombre, tipo, tipoOtro || null, pais || null, ciudad || null, tamano || null, userId || null]
   );
-  return { id, nombreLegal: nombre, sector: sector || null, completitud: 0, action: 'CREATED' };
+  return { id, nombre, tipo, action: 'CREATED' };
 }
 
-async function guardarNecesidadDB(empresaId: string, enunciado: string, urgencia?: string) {
+async function guardarContactoDB(establecimientoId: string, nombre: string, cargo?: string, telefono?: string, email?: string, esDecisor?: boolean) {
   const id = randomUUID();
   await query(
-    `INSERT INTO "Necesidad" ("id","empresaId","enunciado","urgencia","estado") VALUES ($1,$2,$3,$4,'ABIERTO')`,
-    [id, empresaId, enunciado, urgencia || null]
-  );
-  return { id, enunciado, urgencia: urgencia || null };
-}
-
-async function guardarOfertaDB(empresaId: string, capacidad: string, target?: string) {
-  const id = randomUUID();
-  await query(
-    `INSERT INTO "Oferta" ("id","empresaId","capacidad","target") VALUES ($1,$2,$3,$4)`,
-    [id, empresaId, capacidad, target || null]
-  );
-  return { id, capacidad, target: target || null };
-}
-
-async function guardarContactoDB(empresaId: string, nombre: string, cargo?: string, telefono?: string, email?: string) {
-  const id = randomUUID();
-  await query(
-    `INSERT INTO "Contacto" ("id","empresaId","nombre","cargo","telefono","email") VALUES ($1,$2,$3,$4,$5,$6)`,
-    [id, empresaId, nombre, cargo || null, telefono || null, email || null]
+    `INSERT INTO "Contacto" ("id","establecimientoId","nombre","cargo","telefono","email","esDecisor","createdAt") 
+     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
+    [id, establecimientoId, nombre, cargo || null, telefono || null, email || null, esDecisor || false]
   );
   return { id, nombre, cargo: cargo || null };
 }
 
-async function actualizarPropuestaValorDB(empresaId: string, propuestaValor: string) {
-  await query(
-    `UPDATE "Empresa" SET "propuestaValor"=$1, "updatedAt"=$2 WHERE "id"=$3`,
-    [propuestaValor, new Date().toISOString(), empresaId]
-  );
-  return { propuestaValor };
-}
-
-async function guardarSeguimientoDB(necesidadId: string, accion: string, userId: string, resultado?: string) {
+async function crearOportunidadDB(establecimientoId: string, comoConocio: string, hipotesisValor?: string, nivelPotencial?: string, teamMemberId?: string) {
   const id = randomUUID();
+  const now = new Date().toISOString();
   await query(
-    `INSERT INTO "Seguimiento" ("id","necesidadId","accion","resultado","creadoPorId","fecha") VALUES ($1,$2,$3,$4,$5,NOW())`,
-    [id, necesidadId, accion, resultado || null, userId]
+    `INSERT INTO "Oportunidad" ("id","establecimientoId","registradoPorId","comoConocio","hipotesisValor","nivelPotencial","etapaActual","createdAt","updatedAt") 
+     VALUES ($1,$2,$3,$4,$5,$6,'DESCUBRIR',$7,$7)`,
+    [id, establecimientoId, teamMemberId || null, comoConocio, hipotesisValor || null, nivelPotencial || null, now]
   );
-  return { id, accion, resultado: resultado || null };
+  return { id, etapaActual: 'DESCUBRIR', action: 'CREATED' };
 }
 
-async function actualizarNecesidadDB(necesidadId: string, updates: any) {
+async function validarOportunidadDB(oportunidadId: string, pedidosMes?: number, puntoExigente?: string, valorNomi?: string, nivelInteres?: string) {
   const sets: string[] = [];
   const values: any[] = [];
   let idx = 1;
 
-  if (updates.magnitud !== undefined) { sets.push(`"magnitud"=$${idx++}`); values.push(updates.magnitud); }
-  if (updates.proximoPaso !== undefined) { sets.push(`"proximoPaso"=$${idx++}`); values.push(updates.proximoPaso); }
-  if (updates.responsable !== undefined) { sets.push(`"responsable"=$${idx++}`); values.push(updates.responsable); }
-  if (updates.fechaEstimada !== undefined) { sets.push(`"fechaEstimada"=$${idx++}`); values.push(updates.fechaEstimada); }
-  if (updates.prioridad !== undefined) { sets.push(`"prioridad"=$${idx++}`); values.push(updates.prioridad); }
-  if (updates.estado !== undefined) { sets.push(`"estado"=$${idx++}`); values.push(updates.estado); }
-  if (updates.categoria !== undefined) { sets.push(`"categoria"=$${idx++}`); values.push(updates.categoria); }
-  if (updates.urgencia !== undefined) { sets.push(`"urgencia"=$${idx++}`); values.push(updates.urgencia); }
-
-  if (sets.length === 0) return { error: 'No updates provided' };
-
+  if (pedidosMes !== undefined) { sets.push(`"pedidosMes"=$${idx++}`); values.push(pedidosMes); }
+  if (puntoExigente) { sets.push(`"puntoExigente"=$${idx++}`); values.push(puntoExigente); }
+  if (valorNomi) { sets.push(`"valorNomi"=$${idx++}`); values.push(valorNomi); }
+  if (nivelInteres) { sets.push(`"nivelInteres"=$${idx++}`); values.push(nivelInteres); }
+  
+  sets.push(`"etapaActual"='VALIDAR'`);
   sets.push(`"updatedAt"=$${idx++}`);
   values.push(new Date().toISOString());
-  values.push(necesidadId);
+  values.push(oportunidadId);
 
-  await query(
-    `UPDATE "Necesidad" SET ${sets.join(',')} WHERE "id"=$${idx}`,
-    values
-  );
-
-  return { success: true };
+  await query(`UPDATE "Oportunidad" SET ${sets.join(',')} WHERE "id"=$${idx}`, values);
+  return { success: true, etapaActual: 'VALIDAR' };
 }
 
-async function getPortfolioMetricsDB(_userId: string) {
-  // Cross-user: all empresas visible to everyone
-  const necesidades = await query(
-    `SELECT n.*, e."nombreLegal" FROM "Necesidad" n JOIN "Empresa" e ON n."empresaId"=e."id"`
+async function activarOportunidadDB(oportunidadId: string, updates: any) {
+  const sets: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (updates.confirmacionInteres) { sets.push(`"confirmacionInteres"=$${idx++}`); values.push(updates.confirmacionInteres); }
+  if (updates.siguientePaso) { sets.push(`"siguientePaso"=$${idx++}`); values.push(updates.siguientePaso); }
+  if (updates.valorPropuesto) { sets.push(`"valorPropuesto"=$${idx++}`); values.push(updates.valorPropuesto); }
+  if (updates.alcanceImplementacion) { sets.push(`"alcanceImplementacion"=$${idx++}`); values.push(updates.alcanceImplementacion); }
+  if (updates.condiciones) { sets.push(`"condiciones"=$${idx++}`); values.push(updates.condiciones); }
+  if (updates.fechaSeguimiento) { sets.push(`"fechaSeguimiento"=$${idx++}`); values.push(updates.fechaSeguimiento); }
+  if (updates.comentariosCliente) { sets.push(`"comentariosCliente"=$${idx++}`); values.push(updates.comentariosCliente); }
+  if (updates.ajustesSolicitados) { sets.push(`"ajustesSolicitados"=$${idx++}`); values.push(updates.ajustesSolicitados); }
+  if (updates.probabilidadCierre) { sets.push(`"probabilidadCierre"=$${idx++}`); values.push(updates.probabilidadCierre); }
+  if (updates.resultadoFinal) { sets.push(`"resultadoFinal"=$${idx++}`); values.push(updates.resultadoFinal); }
+
+  sets.push(`"etapaActual"=$${idx++}`);
+  values.push(updates.resultadoFinal ? 'CERRADO' : 'ACTIVAR');
+  sets.push(`"updatedAt"=$${idx++}`);
+  values.push(new Date().toISOString());
+  values.push(oportunidadId);
+
+  if (sets.length <= 2) return { error: 'No updates provided' };
+
+  await query(`UPDATE "Oportunidad" SET ${sets.join(',')} WHERE "id"=$${idx}`, values);
+  return { success: true, etapaActual: updates.resultadoFinal ? 'CERRADO' : 'ACTIVAR' };
+}
+
+async function obtenerFichaEstablecimientoDB(establecimientoId: string) {
+  const est = await queryOne(`SELECT * FROM "Establecimiento" WHERE "id"=$1`, [establecimientoId]);
+  if (!est) return { error: 'Establecimiento no encontrado' };
+  const contactos = await query(`SELECT * FROM "Contacto" WHERE "establecimientoId"=$1`, [establecimientoId]);
+  const oportunidades = await query(`SELECT * FROM "Oportunidad" WHERE "establecimientoId"=$1 ORDER BY "createdAt" DESC`, [establecimientoId]);
+  return { establecimiento: est, contactos, oportunidades };
+}
+
+async function getPipelineMetricsDB() {
+  const totalEstablecimientos = await queryOne(`SELECT COUNT(*) as total FROM "Establecimiento"`, []);
+  const porEtapa = await query(
+    `SELECT "etapaActual", COUNT(*) as total FROM "Oportunidad" GROUP BY "etapaActual"`, []
   );
+  const porTipo = await query(
+    `SELECT "tipo", COUNT(*) as total FROM "Establecimiento" GROUP BY "tipo"`, []
+  );
+  const porNivelInteres = await query(
+    `SELECT "nivelInteres", COUNT(*) as total FROM "Oportunidad" WHERE "nivelInteres" IS NOT NULL GROUP BY "nivelInteres"`, []
+  );
+  const totalOportunidades = await queryOne(`SELECT COUNT(*) as total FROM "Oportunidad"`, []);
   
-  const valorTotal = necesidades.reduce((sum: number, n: any) => sum + (parseFloat(n.magnitud) || 0), 0);
-  const porEstado = necesidades.reduce((acc: any, n: any) => {
-    acc[n.estado] = (acc[n.estado] || 0) + 1;
-    return acc;
-  }, {});
-  const porPrioridad = necesidades.reduce((acc: any, n: any) => {
-    const p = n.prioridad || 'sin_asignar';
-    acc[p] = (acc[p] || 0) + 1;
-    return acc;
-  }, {});
-
-  const empresas = await query(
-    `SELECT COUNT(DISTINCT "id") as total FROM "Empresa"`
-  );
-
   return {
-    totalEmpresas: parseInt(empresas[0]?.total || '0'),
-    totalNecesidades: necesidades.length,
-    valorTotal,
-    porEstado,
-    porPrioridad,
+    totalEstablecimientos: parseInt(totalEstablecimientos?.total || '0'),
+    totalOportunidades: parseInt(totalOportunidades?.total || '0'),
+    porEtapa: porEtapa.reduce((acc: any, r: any) => { acc[r.etapaActual] = parseInt(r.total); return acc; }, {}),
+    porTipo: porTipo.reduce((acc: any, r: any) => { acc[r.tipo] = parseInt(r.total); return acc; }, {}),
+    porNivelInteres: porNivelInteres.reduce((acc: any, r: any) => { acc[r.nivelInteres || 'sin_dato'] = parseInt(r.total); return acc; }, {}),
   };
 }
 
-async function buscarNecesidadesDB(_userId: string, filters: any) {
-  let sql = `SELECT n.*, e."nombreLegal" FROM "Necesidad" n JOIN "Empresa" e ON n."empresaId"=e."id" WHERE 1=1`;
-  const params: any[] = [];
-  let idx = 1;
-
-  if (filters.estado) {
-    sql += ` AND n."estado"=$${idx++}`;
-    params.push(filters.estado);
-  }
-  if (filters.prioridad) {
-    sql += ` AND n."prioridad"=$${idx++}`;
-    params.push(filters.prioridad);
-  }
-  if (filters.magnitudMin !== undefined) {
-    sql += ` AND n."magnitud">=$${idx++}`;
-    params.push(filters.magnitudMin);
-  }
-  if (filters.magnitudMax !== undefined) {
-    sql += ` AND n."magnitud"<=$${idx++}`;
-    params.push(filters.magnitudMax);
-  }
-
-  sql += ` ORDER BY n."magnitud" DESC NULLS LAST LIMIT 20`;
-
-  return await query(sql, params);
-}
-
-async function getNecesidadesVencidasDB(_userId: string) {
+async function getOportunidadesPorEtapaDB(etapa: string) {
   return await query(
-    `SELECT n.*, e."nombreLegal" FROM "Necesidad" n JOIN "Empresa" e ON n."empresaId"=e."id" WHERE n."fechaEstimada"<NOW() AND n."estado"!='RESUELTO' ORDER BY n."fechaEstimada" ASC`
+    `SELECT o.*, e."nombre" as "nombreEstablecimiento", e."tipo", e."ciudad", e."pais"
+     FROM "Oportunidad" o 
+     JOIN "Establecimiento" e ON o."establecimientoId"=e."id" 
+     WHERE o."etapaActual"=$1 
+     ORDER BY o."updatedAt" DESC LIMIT 20`,
+    [etapa]
   );
 }
 
-// ── Acciones Pendientes (by responsable, with filters) ─────────
-
-async function getAccionesPendientesDB(filters: { responsable?: string, orderBy?: string, limit?: number }) {
-  let sql = `SELECT n.*, e."nombreLegal" 
-    FROM "Necesidad" n 
-    JOIN "Empresa" e ON n."empresaId"=e."id" 
-    WHERE n."responsable" IS NOT NULL 
-      AND n."estado" != 'RESUELTO'`;
-  const params: any[] = [];
-  let idx = 1;
-
-  if (filters.responsable) {
-    sql += ` AND LOWER(n."responsable") LIKE LOWER($${idx++})`;
-    params.push(`%${filters.responsable}%`);
-  }
-
-  const orderBy = filters.orderBy || 'deadline';
-  switch (orderBy) {
-    case 'impact':
-      sql += ` ORDER BY n."magnitud" DESC NULLS LAST`;
-      break;
-    case 'urgency':
-      sql += ` ORDER BY CASE n."prioridad" WHEN 'alta' THEN 1 WHEN 'media' THEN 2 WHEN 'baja' THEN 3 ELSE 4 END, n."fechaEstimada" ASC NULLS LAST`;
-      break;
-    case 'deadline':
-    default:
-      sql += ` ORDER BY n."fechaEstimada" ASC NULLS LAST`;
-      break;
-  }
-
-  sql += ` LIMIT $${idx}`;
-  params.push(filters.limit || 20);
-
-  return await query(sql, params);
-}
-
-async function getEmpresaMetricsDB(empresaId: string) {
-  const empresa = await queryOne(`SELECT * FROM "Empresa" WHERE "id"=$1`, [empresaId]);
-  if (!empresa) return { error: 'Empresa no encontrada' };
-
-  const necesidades = await query(`SELECT * FROM "Necesidad" WHERE "empresaId"=$1`, [empresaId]);
-  const valorTotal = necesidades.reduce((sum: number, n: any) => sum + (parseFloat(n.magnitud) || 0), 0);
-  const porEstado = necesidades.reduce((acc: any, n: any) => {
-    acc[n.estado] = (acc[n.estado] || 0) + 1;
-    return acc;
-  }, {});
-
-  return {
-    empresa: {
-      nombreLegal: empresa.nombreLegal,
-      sector: empresa.sector,
-      propuestaValor: empresa.propuestaValor,
-    },
-    totalNecesidades: necesidades.length,
-    valorTotal,
-    porEstado,
-  };
-}
-
-async function obtenerFichaDB(empresaId: string) {
-  const empresa = await queryOne(`SELECT * FROM "Empresa" WHERE "id"=$1`, [empresaId]);
-  if (!empresa) return { error: 'Empresa no encontrada' };
-  const contactos = await query(`SELECT "nombre","cargo","telefono","email" FROM "Contacto" WHERE "empresaId"=$1`, [empresaId]);
-  const necesidades = await query(`SELECT "enunciado","urgencia","estado" FROM "Necesidad" WHERE "empresaId"=$1`, [empresaId]);
-  const ofertas = await query(`SELECT "capacidad","target" FROM "Oferta" WHERE "empresaId"=$1`, [empresaId]);
-  return { empresa, contactos, necesidades, ofertas };
-}
-
-async function recalcularCompletitud(empresaId: string) {
-  const contactos = await query(`SELECT COUNT(*) as c FROM "Contacto" WHERE "empresaId"=$1`, [empresaId]);
-  const necesidades = await query(`SELECT COUNT(*) as c FROM "Necesidad" WHERE "empresaId"=$1`, [empresaId]);
-  const ofertas = await query(`SELECT COUNT(*) as c FROM "Oferta" WHERE "empresaId"=$1`, [empresaId]);
-  const empresa = await queryOne(`SELECT "propuestaValor" FROM "Empresa" WHERE "id"=$1`, [empresaId]);
-
-  let score = 0;
-  const missing: string[] = [];
-  if (parseInt(contactos[0]?.c) > 0) score += 25; else missing.push("contacto");
-  if (parseInt(necesidades[0]?.c) > 0) score += 25; else missing.push("necesidad");
-  if (parseInt(ofertas[0]?.c) > 0) score += 25; else missing.push("oferta");
-  if (empresa?.propuestaValor) score += 25; else missing.push("propuesta de valor");
-
-  const estado = score === 100 ? 'COMPLETO' : score >= 50 ? 'MINIMO' : 'INCOMPLETO';
+async function guardarSeguimientoDB(oportunidadId: string, accion: string, userId: string, resultado?: string) {
+  const id = randomUUID();
   await query(
-    `UPDATE "Empresa" SET "completitud"=$1,"camposFaltantes"=$2,"estadoFicha"=$3,"updatedAt"=$4 WHERE "id"=$5`,
-    [score, JSON.stringify(missing), estado, new Date().toISOString(), empresaId]
+    `INSERT INTO "Seguimiento" ("id","oportunidadId","accion","resultado","creadoPorId","fecha") VALUES ($1,$2,$3,$4,$5,NOW())`,
+    [id, oportunidadId, accion, resultado || null, userId]
   );
-  return { score, missing, estado };
+  return { id, accion, resultado: resultado || null };
+}
+
+// ── Resolve establecimientoId from name ────────────────────────
+
+async function resolveEstablecimientoId(input: string): Promise<string | null> {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)) {
+    return input;
+  }
+  const results = await buscarEstablecimientoDB(input);
+  if (results.length > 0) return results[0].id;
+  return null;
 }
 
 // ── Tool definitions for Gemini API ────────────────────────────
@@ -325,331 +211,211 @@ async function recalcularCompletitud(empresaId: string) {
 const TOOLS = [{
   functionDeclarations: [
     {
-      name: 'buscarEmpresa',
-      description: 'Buscar empresa por nombre o alias. Usar SIEMPRE antes de crear para evitar duplicados.',
-      parameters: { type: 'OBJECT', properties: { searchQuery: { type: 'STRING', description: 'Nombre a buscar' } }, required: ['searchQuery'] }
+      name: 'buscarEstablecimiento',
+      description: 'Buscar establecimiento por nombre o ciudad. Usar SIEMPRE antes de crear para evitar duplicados.',
+      parameters: { type: 'OBJECT', properties: { searchQuery: { type: 'STRING', description: 'Nombre o ciudad a buscar' } }, required: ['searchQuery'] }
     },
     {
-      name: 'crearEmpresa',
-      description: 'Crear empresa nueva. Solo usar después de buscar y confirmar que no existe.',
-      parameters: { type: 'OBJECT', properties: { nombre: { type: 'STRING' }, sector: { type: 'STRING' } }, required: ['nombre'] }
-    },
-    {
-      name: 'guardarNecesidad',
-      description: 'Registrar una necesidad de una empresa. Campos opcionales: magnitud, proximoPaso, responsable, fechaEstimada, prioridad, categoria.',
+      name: 'crearEstablecimiento',
+      description: 'Crear establecimiento nuevo. Solo usar después de buscar y confirmar que no existe.',
       parameters: { 
         type: 'OBJECT', 
         properties: { 
-          empresaId: { type: 'STRING' }, 
-          enunciado: { type: 'STRING' }, 
-          urgencia: { type: 'STRING' },
-          magnitud: { type: 'NUMBER', description: 'Valor económico del problema en COP (opcional)' },
-          proximoPaso: { type: 'STRING', description: 'Próxima acción a tomar (opcional)' },
-          responsable: { type: 'STRING', description: 'Persona responsable (opcional)' },
-          fechaEstimada: { type: 'STRING', description: 'Fecha estimada de resolución en formato ISO (opcional)' },
-          prioridad: { type: 'STRING', description: 'alta, media o baja (opcional)' },
-          categoria: { type: 'STRING', description: 'Categoría estratégica: Inversión, Innovación, Internacionalización o General (opcional, por defecto General)' }
+          nombre: { type: 'STRING' }, 
+          tipo: { type: 'STRING', description: 'RESTAURANTE, CLUB, HOTEL, BAR, EXPERIENCIA_TURISTICA, OTRO' },
+          tipoOtro: { type: 'STRING', description: 'Si tipo es OTRO, especificar aquí' },
+          pais: { type: 'STRING' }, 
+          ciudad: { type: 'STRING' },
+          tamano: { type: 'STRING', description: 'Tamaño aproximado del establecimiento' }
         }, 
-        required: ['empresaId', 'enunciado'] 
+        required: ['nombre', 'tipo'] 
       }
-    },
-    {
-      name: 'actualizarNecesidad',
-      description: 'Actualizar campos de una necesidad existente (magnitud, proximoPaso, responsable, fechaEstimada, prioridad, estado).',
-      parameters: { 
-        type: 'OBJECT', 
-        properties: { 
-          necesidadId: { type: 'STRING' },
-          magnitud: { type: 'NUMBER' },
-          proximoPaso: { type: 'STRING' },
-          responsable: { type: 'STRING' },
-          fechaEstimada: { type: 'STRING' },
-          prioridad: { type: 'STRING' },
-          estado: { type: 'STRING' }
-        }, 
-        required: ['necesidadId'] 
-      }
-    },
-    {
-      name: 'guardarOferta',
-      description: 'Registrar una oferta o capacidad de una empresa.',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' }, capacidad: { type: 'STRING' }, target: { type: 'STRING' } }, required: ['empresaId', 'capacidad'] }
     },
     {
       name: 'guardarContacto',
-      description: 'Registrar un contacto de una empresa.',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' }, nombre: { type: 'STRING' }, cargo: { type: 'STRING' }, telefono: { type: 'STRING' }, email: { type: 'STRING' } }, required: ['empresaId', 'nombre'] }
+      description: 'Registrar un contacto del establecimiento.',
+      parameters: { 
+        type: 'OBJECT', 
+        properties: { 
+          establecimientoId: { type: 'STRING' }, 
+          nombre: { type: 'STRING' }, 
+          cargo: { type: 'STRING' }, 
+          telefono: { type: 'STRING' }, 
+          email: { type: 'STRING' },
+          esDecisor: { type: 'BOOLEAN', description: 'true si esta persona toma decisiones de tecnología/innovación' }
+        }, 
+        required: ['establecimientoId', 'nombre'] 
+      }
     },
     {
-      name: 'actualizarPropuestaValor',
-      description: 'Registrar o actualizar la propuesta de valor de una empresa (lo que la hace única).',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' }, propuestaValor: { type: 'STRING' } }, required: ['empresaId', 'propuestaValor'] }
+      name: 'crearOportunidad',
+      description: 'Crear una nueva oportunidad para un establecimiento (Etapa DESCUBRIR). Registra cómo se conoció, hipótesis de valor y nivel de potencial.',
+      parameters: { 
+        type: 'OBJECT', 
+        properties: { 
+          establecimientoId: { type: 'STRING' }, 
+          comoConocio: { type: 'STRING', description: 'REFERIDO, VISITA, SOCIO, EVENTO, INVESTIGACION, OTRO' },
+          hipotesisValor: { type: 'STRING', description: 'Cómo crees que Nomi podría encajar aquí' },
+          nivelPotencial: { type: 'STRING', description: 'ALTO, MEDIO, BAJO' }
+        }, 
+        required: ['establecimientoId', 'comoConocio'] 
+      }
+    },
+    {
+      name: 'validarOportunidad',
+      description: 'Mover oportunidad a Etapa VALIDAR. Registrar datos de validación: pedidos/mes, punto exigente, dónde Nomi aporta valor, nivel de interés.',
+      parameters: { 
+        type: 'OBJECT', 
+        properties: { 
+          oportunidadId: { type: 'STRING' },
+          pedidosMes: { type: 'NUMBER', description: 'Pedidos aproximados por mes' },
+          puntoExigente: { type: 'STRING', description: 'Qué parte del servicio es más exigente: TOMAR_PEDIDOS, EXPLICAR_MENU, DESPLAZAMIENTO_MESEROS, ENVIO_COCINA, ATENCION_SIMULTANEA, OTRO' },
+          valorNomi: { type: 'STRING', description: 'Dónde Nomi aporta más valor: TOMA_PEDIDOS, EXPLICACION_MENU, ATENCION_MULTIMESA, CLIENTES_INTERNACIONALES, APOYO_EVENTOS, CAPACITACION, OTRO' },
+          nivelInteres: { type: 'STRING', description: 'ALTO, MEDIO, BAJO' }
+        }, 
+        required: ['oportunidadId'] 
+      }
+    },
+    {
+      name: 'activarOportunidad',
+      description: 'Mover oportunidad a Etapa ACTIVAR o cerrarla. Registrar confirmación de interés, propuesta, negociación y cierre.',
+      parameters: { 
+        type: 'OBJECT', 
+        properties: { 
+          oportunidadId: { type: 'STRING' },
+          confirmacionInteres: { type: 'STRING', description: 'SI_AVANZAR, INTERES_ALTO_REVISANDO, INTERES_MEDIO, NO_POR_AHORA' },
+          siguientePaso: { type: 'STRING', description: 'REUNION_TECNICA, REVISION_COMERCIAL, PRESENTACION_JUNTA, DEFINICION_FECHAS' },
+          valorPropuesto: { type: 'STRING' },
+          alcanceImplementacion: { type: 'STRING' },
+          condiciones: { type: 'STRING' },
+          fechaSeguimiento: { type: 'STRING', description: 'Fecha ISO para próximo seguimiento' },
+          comentariosCliente: { type: 'STRING' },
+          ajustesSolicitados: { type: 'STRING' },
+          probabilidadCierre: { type: 'STRING', description: 'ALTA, MEDIA, BAJA' },
+          resultadoFinal: { type: 'STRING', description: 'VENTA_CERRADA, EN_PAUSA, DESCARTADA — si se llena, la oportunidad se cierra' }
+        }, 
+        required: ['oportunidadId'] 
+      }
     },
     {
       name: 'obtenerFicha',
-      description: 'Obtener la ficha completa de una empresa con contactos, necesidades y ofertas.',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' } }, required: ['empresaId'] }
+      description: 'Obtener la ficha completa de un establecimiento con contactos y oportunidades.',
+      parameters: { type: 'OBJECT', properties: { establecimientoId: { type: 'STRING' } }, required: ['establecimientoId'] }
     },
     {
-      name: 'analizar_portafolio',
-      description: 'Obtener métricas del portafolio completo del usuario: total empresas, necesidades, valor de problemas, distribución por estado/prioridad.',
+      name: 'verPipeline',
+      description: 'Ver métricas del pipeline: total establecimientos, oportunidades por etapa DVA, tipos de establecimiento, niveles de interés.',
       parameters: { type: 'OBJECT', properties: {} }
     },
     {
-      name: 'buscar_necesidades',
-      description: 'Buscar y filtrar necesidades por estado, prioridad o rango de magnitud.',
+      name: 'verOportunidadesPorEtapa',
+      description: 'Listar oportunidades filtradas por etapa del funnel DVA.',
       parameters: { 
         type: 'OBJECT', 
         properties: { 
-          estado: { type: 'STRING' },
-          prioridad: { type: 'STRING' },
-          magnitudMin: { type: 'NUMBER' },
-          magnitudMax: { type: 'NUMBER' }
-        }
+          etapa: { type: 'STRING', description: 'DESCUBRIR, VALIDAR, ACTIVAR, CERRADO' } 
+        }, 
+        required: ['etapa'] 
       }
     },
     {
-      name: 'agregar_seguimiento',
-      description: 'Agregar un seguimiento a una necesidad (acción tomada, resultado obtenido).',
+      name: 'agregarSeguimiento',
+      description: 'Agregar un seguimiento a una oportunidad (acción tomada, resultado).',
       parameters: { 
         type: 'OBJECT', 
         properties: { 
-          necesidadId: { type: 'STRING' },
+          oportunidadId: { type: 'STRING' },
           accion: { type: 'STRING', description: 'Acción realizada' },
           resultado: { type: 'STRING', description: 'Resultado obtenido (opcional)' }
         },
-        required: ['necesidadId', 'accion']
+        required: ['oportunidadId', 'accion']
       }
-    },
-    {
-      name: 'ver_vencidas',
-      description: 'Obtener todas las necesidades vencidas (fechaEstimada pasada y no resueltas).',
-      parameters: { type: 'OBJECT', properties: {} }
-    },
-    {
-      name: 'drill_down_empresa',
-      description: 'Análisis profundo de una empresa: total necesidades, valor, distribución por estado.',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' } }, required: ['empresaId'] }
-    },
-    {
-      name: 'ver_acciones_pendientes',
-      description: 'Ver acciones/necesidades pendientes con responsable asignado. Filtrar por responsable, ordenar por impacto (magnitud), urgencia (prioridad), o deadline (fecha más próxima). Ideal para "¿qué tiene Bryan pendiente?", "top 3 más urgentes", "acciones próximas a vencer".',
-      parameters: { 
-        type: 'OBJECT', 
-        properties: { 
-          responsable: { type: 'STRING', description: 'Filtrar por nombre del responsable (parcial OK, ej: "Bryan")' },
-          orderBy: { type: 'STRING', description: 'Criterio de orden: "impact" (mayor magnitud), "urgency" (mayor prioridad), "deadline" (más próxima a vencer). Default: deadline' },
-          limit: { type: 'NUMBER', description: 'Cantidad máxima de resultados. Default: 20' }
-        }
-      }
-    },
-    {
-      name: 'ver_historial_empresa',
-      description: 'Ver todo lo que se ha registrado/hablado sobre una empresa: necesidades, ofertas, contactos, acciones, por todos los usuarios. Ideal para "¿qué sabemos de Claxen?" o "¿qué se ha hablado con Sucroal?".',
-      parameters: { type: 'OBJECT', properties: { empresaId: { type: 'STRING' } }, required: ['empresaId'] }
     },
   ]
 }];
 
-const SYSTEM_PROMPT = `Eres un Analista de Inteligencia Económica de la Cámara de Comercio de Cali. Eres conversacional, flexible y humano.
+const SYSTEM_PROMPT = `Eres Nomi, la asistente de ventas de la plataforma Nomi — un sistema de atención inteligente para restaurantes y establecimientos gastronómicos.
 
-Tu trabajo: registrar empresas, contactos, necesidades y ofertas a partir de conversaciones o resúmenes de reuniones.
+Tu trabajo: ayudar al equipo comercial de Nomi a registrar, validar y activar oportunidades de venta usando el Modelo DVA (Descubrir · Validar · Activar).
 
-CHECKLIST por empresa (guía, NO bloqueo):
-- Contacto (25%) — nombre y datos de una persona de contacto
-- Necesidad (25%) — qué necesita la empresa
-- Oferta (25%) — qué ofrece o en qué es fuerte
-- Propuesta de Valor (25%) — qué la hace única, su diferenciador clave
+## Modelo DVA
 
-FILOSOFÍA DE GUARDADO:
-- **Guarda info parcial sin bloquear**: Si el usuario da nombre de empresa + una percepción/insight relevante, ¡guárdalo! No exijas todos los campos.
-- **Sé conversacional, no interrogatorio**: Si el usuario da más info (magnitud, próximo paso, responsable, fecha, prioridad), genial, guárdala. Si no, NO insistas.
-- **Respeta decisiones**: Si el usuario dice "guárdalo así" o "eso es todo", guarda lo que hay sin preguntar más.
-- **Pregunta amablemente**: Puedes sugerir agregar más datos ("¿Conoces la magnitud del problema?" o "¿Hay un responsable asignado?"), pero si dice "no" o "no sé", acepta y guarda.
-- **Magnitud/proximoPaso/responsable/fechaEstimada/prioridad son opcionales**: Ayudan a priorizar, pero NO son obligatorios para guardar.
+El funnel tiene 3 etapas:
 
-CATEGORÍAS ESTRATÉGICAS (3i + General):
-- Cuando registres una necesidad, clasifícala en una de estas 4 categorías:
-  • **Inversión**: Necesidades relacionadas con capital, financiamiento, expansión de operaciones
-  • **Innovación**: Necesidades de tecnología, R&D, nuevos productos/procesos, transformación digital
-  • **Internacionalización**: Necesidades de exportación, mercados externos, alianzas internacionales
-  • **General**: Si no encaja claramente en las 3i, usa esta categoría
-- Asigna la categoría automáticamente según el contexto de la necesidad. Si no es claro, usa "General".
+### Etapa 1 — DESCUBRIR
+Identificar si vale la pena explorar una oportunidad:
+- Nombre y tipo del establecimiento (restaurante, club, hotel, bar, etc.)
+- País, ciudad, tamaño
+- Cómo lo conociste (referido, visita, socio, evento, investigación)
+- Hipótesis de valor: ¿cómo podría Nomi encajar aquí?
+- Contacto dentro del establecimiento (si existe)
+- Nivel inicial de potencial (alto/medio/bajo)
 
-INFERENCIA AUTOMÁTICA (NO preguntar al usuario):
-- **Sector**: SIEMPRE infiere el sector de la empresa a partir del contexto (ej: "panadería" → "Alimentos", "laboratorio farmacéutico" → "Farmacéutico", "empresa de software" → "Tecnología"). NUNCA preguntes "¿cuál es el sector?" — dedúcelo tú.
-- **Categoría de necesidad**: Clasifícala automáticamente en las 3i o General sin preguntar.
-- **Propuesta de valor**: Si el usuario da suficiente contexto, infiérela. Si no, déjala para después.
-- Regla de oro: Si puedes deducirlo del contexto, NO lo preguntes. Solo pregunta lo que NO se puede inferir.
+### Etapa 2 — VALIDAR
+Confirmar si Nomi realmente aporta valor:
+- ¿Cuántos pedidos aproximados atienden por mes?
+- ¿Qué parte del servicio es más exigente? (tomar pedidos, explicar menú, desplazamiento meseros, envío a cocina, atención simultánea)
+- ¿Quién toma decisiones de tecnología/innovación?
+- ¿Dónde Nomi aporta más valor? (toma de pedidos, explicación menú, atención multimesa, clientes internacionales, eventos, capacitación)
+- Nivel de interés del establecimiento
 
-FLUJO DE TRABAJO:
-- Usa las herramientas para TODAS las operaciones de base de datos. No inventes datos.
-- Cuando el usuario mencione una empresa nueva, PRIMERO búscala. Si no existe, créala CON el sector inferido.
-- CRÍTICO: Cuando crees una empresa, el resultado incluye un "id" (UUID). USA ESE ID EXACTO como empresaId en todas las operaciones siguientes (guardarNecesidad, guardarOferta, guardarContacto). NO uses el nombre de la empresa como empresaId.
-- Después de crear o encontrar una empresa, registra necesidades, ofertas, contactos y propuesta de valor según la info disponible.
-- NUNCA digas "he registrado" si no ejecutaste el tool call correspondiente. Solo confirma lo que realmente guardaste.
-- Siempre indica la completitud actual y qué falta para completar la ficha (pero como guía, no como bloqueo).
-- Si el usuario da un resumen de reunión, extrae TODA la info y registra todo de una vez.
-- Usa 'propuesta de valor' en lugar de 'diferenciador' en todas tus respuestas.
+### Etapa 3 — ACTIVAR
+Iniciar el proceso de implementación:
+- Confirmación de interés
+- Responsable interno del establecimiento
+- Siguiente paso acordado
+- Propuesta comercial (valor, alcance, condiciones)
+- Negociación y ajustes
+- Cierre (venta cerrada / en pausa / descartada)
 
-REGLA CRÍTICA — MÚLTIPLES REGISTROS EN UN MISMO MENSAJE:
-- Si el usuario menciona MÚLTIPLES empresas o registros en un solo mensaje, DEBES procesarlos TODOS antes de dar una respuesta de texto.
-- NO generes una respuesta de texto después de procesar solo la primera empresa. Continúa haciendo tool calls hasta que TODAS las empresas/registros estén guardados.
-- Flujo correcto: buscar empresa A → crear A → guardar datos A → buscar empresa B → crear B → guardar datos B → AHORA SÍ responde con texto confirmando AMBOS registros.
-- Si mencionan 2 empresas, deben haber al menos 2 llamadas a crearEmpresa (o buscarEmpresa si ya existen). Si solo hiciste 1, NO has terminado.
-- Esto aplica también a múltiples necesidades, ofertas o contactos para la misma empresa — procesa TODOS antes de responder.
+## Reglas de Operación
 
-BÚSQUEDA DIRECTA:
-- Cuando el usuario pide "busca empresa X" o "muéstrame datos de empresa X", AUTOMÁTICAMENTE usa 'buscarEmpresa' seguido de 'obtenerFicha' y muestra la información completa sin preguntar si quiere verla.
-- No preguntes "¿quieres ver la ficha?" — muéstrala directamente.
-- La búsqueda es fuzzy: si el usuario escribe "Lactive" y existe "Lactive Cali", la encontrará. No necesita el nombre exacto.
+- **Guarda info parcial sin bloquear**: No necesitas todos los campos. Si dan nombre + tipo, crea el establecimiento.
+- **Sé conversacional**: No interrogues. Registra lo que te den y sugiere amablemente completar.
+- **Infiere automáticamente**: País, ciudad, tipo de establecimiento — dedúcelo del contexto. No preguntes lo obvio.
+- **SIEMPRE busca antes de crear**: Evita duplicados.
+- **Usa los IDs correctos**: Después de crear, usa el UUID devuelto para operaciones siguientes.
+- **Múltiples registros**: Si mencionan varios establecimientos, procesa TODOS antes de responder.
+- **Búsqueda directa**: Si piden "busca X", busca y muestra la ficha sin preguntar.
+- **Cross-usuario**: Todos los registros son visibles para todo el equipo.
 
-VISIBILIDAD CROSS-USUARIO:
-- TODAS las empresas son visibles para TODOS los usuarios del equipo. No hay filtro por usuario.
-- Varios usuarios pueden aportar información a la misma empresa. Cada aporte SUMA (nunca sobreescribe).
-- Si alguien pregunta "¿qué sabemos de Claxen?", usa 'ver_historial_empresa' para mostrar TODO lo registrado por cualquier usuario.
-
-ACCIONES PENDIENTES:
-- Las acciones/tareas pendientes se derivan del campo "responsable" y "proximoPaso" en las necesidades.
-- Cuando el usuario pregunte por acciones pendientes, tareas, o seguimientos, usa 'ver_acciones_pendientes'.
-- Soporta filtros: por responsable ("¿qué tiene Bryan?"), por impacto ("top 3 más importantes"), por urgencia ("más urgentes"), por deadline ("próximas a vencer").
-- Ejemplo: "dime las 3 acciones más urgentes" → ver_acciones_pendientes(orderBy: "urgency", limit: 3)
-
-Responde en español, directo y profesional.`;
+## Tono
+Profesional pero cercana. Directa y eficiente. Usas español. Eres parte del equipo Nomi.`;
 
 // ── Execute tool calls ─────────────────────────────────────────
 
-// Resolve empresaId: if it's not a UUID, search by name (fuzzy)
-async function resolveEmpresaId(empresaId: string, _userId?: string): Promise<string | null> {
-  // Check if it looks like a UUID
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(empresaId)) {
-    return empresaId;
-  }
-  // Fuzzy search all empresas (cross-user)
-  const results = await buscarEmpresaDB(empresaId);
-  if (results.length > 0) return results[0].id;
-  return null;
-}
-
 async function executeTool(name: string, args: any, userId?: string): Promise<any> {
-  // For tools that need empresaId, resolve name to UUID
-  if (args.empresaId && name !== 'buscarEmpresa' && name !== 'crearEmpresa') {
-    const resolvedId = await resolveEmpresaId(args.empresaId, userId);
-    if (!resolvedId) return { error: `Empresa "${args.empresaId}" no encontrada. Búscala primero.` };
-    args.empresaId = resolvedId;
+  // Resolve establecimientoId from name if needed
+  if (args.establecimientoId && name !== 'buscarEstablecimiento' && name !== 'crearEstablecimiento') {
+    const resolvedId = await resolveEstablecimientoId(args.establecimientoId);
+    if (!resolvedId) return { error: `Establecimiento "${args.establecimientoId}" no encontrado. Búscalo primero.` };
+    args.establecimientoId = resolvedId;
   }
 
   switch (name) {
-    case 'buscarEmpresa': return buscarEmpresaDB(args.searchQuery, userId);
-    case 'crearEmpresa': {
-      const result = await crearEmpresaDB(args.nombre, userId, args.sector);
-      return { ...result, message: `Empresa creada exitosamente. IMPORTANTE: usa empresaId="${result.id}" para todas las operaciones siguientes con esta empresa.` };
-    }
-    case 'guardarNecesidad': {
-      // Check if similar necesidad already exists for this empresa
-      const existentes = await query(
-        `SELECT * FROM "Necesidad" WHERE "empresaId"=$1 AND LOWER("enunciado") LIKE $2 LIMIT 1`,
-        [args.empresaId, `%${args.enunciado.toLowerCase().substring(0, 30)}%`]
-      );
-      
-      if (existentes.length > 0) {
-        // Similar necesidad exists — update it instead of creating new
-        const existing = existentes[0];
-        const updates: any = {};
-        if (args.magnitud && !existing.magnitud) updates.magnitud = args.magnitud;
-        if (args.proximoPaso && !existing.proximoPaso) updates.proximoPaso = args.proximoPaso;
-        if (args.responsable && !existing.responsable) updates.responsable = args.responsable;
-        if (args.fechaEstimada && !existing.fechaEstimada) updates.fechaEstimada = args.fechaEstimada;
-        if (args.prioridad && !existing.prioridad) updates.prioridad = args.prioridad;
-        if (args.urgencia && !existing.urgencia) updates.urgencia = args.urgencia;
-        if (args.categoria && !existing.categoria) updates.categoria = args.categoria;
-        
-        if (Object.keys(updates).length > 0) {
-          await actualizarNecesidadDB(existing.id, updates);
-          const comp = await recalcularCompletitud(args.empresaId);
-          return { 
-            id: existing.id, 
-            enunciado: existing.enunciado, 
-            action: 'ACTUALIZADA',
-            completitud: comp,
-            message: 'Necesidad existente actualizada con nuevos campos'
-          };
-        }
-        
-        return {
-          id: existing.id,
-          enunciado: existing.enunciado,
-          action: 'YA_EXISTE',
-          message: 'Esta necesidad ya estaba registrada y completa'
-        };
-      }
-      
-      // No existe — crear nueva
-      const categoria = args.categoria || 'General';
-      
-      const id = randomUUID();
-      await query(
-        `INSERT INTO "Necesidad" ("id","empresaId","enunciado","categoria","urgencia","magnitud","proximoPaso","responsable","fechaEstimada","prioridad","estado") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ABIERTO')`,
-        [
-          id, 
-          args.empresaId, 
-          args.enunciado,
-          categoria,
-          args.urgencia || null,
-          args.magnitud || null,
-          args.proximoPaso || null,
-          args.responsable || null,
-          args.fechaEstimada || null,
-          args.prioridad || null
-        ]
-      );
-      
-      const comp = await recalcularCompletitud(args.empresaId);
-      return { 
-        id, 
-        enunciado: args.enunciado,
-        categoria,
-        action: 'CREADA',
-        completitud: comp
-      };
-    }
-    case 'actualizarNecesidad': {
-      const result = await actualizarNecesidadDB(args.necesidadId, args);
-      return result;
-    }
-    case 'guardarOferta': {
-      const result = await guardarOfertaDB(args.empresaId, args.capacidad, args.target);
-      const comp = await recalcularCompletitud(args.empresaId);
-      return { ...result, completitud: comp };
+    case 'buscarEstablecimiento': return buscarEstablecimientoDB(args.searchQuery);
+    case 'crearEstablecimiento': {
+      const result = await crearEstablecimientoDB(args.nombre, args.tipo, userId, args.pais, args.ciudad, args.tamano, args.tipoOtro);
+      return { ...result, message: `Usa establecimientoId="${result.id}" para las operaciones siguientes.` };
     }
     case 'guardarContacto': {
-      const result = await guardarContactoDB(args.empresaId, args.nombre, args.cargo, args.telefono, args.email);
-      const comp = await recalcularCompletitud(args.empresaId);
-      return { ...result, completitud: comp };
+      return guardarContactoDB(args.establecimientoId, args.nombre, args.cargo, args.telefono, args.email, args.esDecisor);
     }
-    case 'actualizarPropuestaValor': {
-      const result = await actualizarPropuestaValorDB(args.empresaId, args.propuestaValor);
-      const comp = await recalcularCompletitud(args.empresaId);
-      return { ...result, completitud: comp };
+    case 'crearOportunidad': {
+      // Try to find team member for this user
+      let teamMemberId = null;
+      if (userId) {
+        const tm = await queryOne(`SELECT "id" FROM "TeamMember" WHERE "userId"=$1`, [userId]);
+        teamMemberId = tm?.id || null;
+      }
+      return crearOportunidadDB(args.establecimientoId, args.comoConocio, args.hipotesisValor, args.nivelPotencial, teamMemberId);
     }
-    case 'obtenerFicha': return obtenerFichaDB(args.empresaId);
-    case 'analizar_portafolio': return userId ? getPortfolioMetricsDB(userId) : { error: 'Usuario no autenticado' };
-    case 'buscar_necesidades': return userId ? buscarNecesidadesDB(userId, args) : { error: 'Usuario no autenticado' };
-    case 'agregar_seguimiento': return userId ? guardarSeguimientoDB(args.necesidadId, args.accion, userId, args.resultado) : { error: 'Usuario no autenticado' };
-    case 'ver_vencidas': return userId ? getNecesidadesVencidasDB(userId) : { error: 'Usuario no autenticado' };
-    case 'drill_down_empresa': return getEmpresaMetricsDB(args.empresaId);
-    case 'ver_acciones_pendientes': return getAccionesPendientesDB({ responsable: args.responsable, orderBy: args.orderBy, limit: args.limit });
-    case 'ver_historial_empresa': {
-      const resolvedId = await resolveEmpresaId(args.empresaId, userId);
-      if (!resolvedId) return { error: `Empresa "${args.empresaId}" no encontrada.` };
-      const empresa = await queryOne(`SELECT * FROM "Empresa" WHERE "id"=$1`, [resolvedId]);
-      const contactos = await query(`SELECT c.*, u."name" as "creadoPorNombre" FROM "Contacto" c LEFT JOIN "User" u ON c."origen"=u."id" WHERE c."empresaId"=$1 ORDER BY c."nombre"`, [resolvedId]);
-      const necesidades = await query(`SELECT * FROM "Necesidad" WHERE "empresaId"=$1 ORDER BY "id"`, [resolvedId]);
-      const ofertas = await query(`SELECT * FROM "Oferta" WHERE "empresaId"=$1 ORDER BY "id"`, [resolvedId]);
-      const acciones = await query(`SELECT * FROM "Accion" WHERE "empresaId"=$1 ORDER BY "fechaLimite" ASC NULLS LAST`, [resolvedId]);
-      const reuniones = await query(`SELECT * FROM "Reunion" WHERE "empresaId"=$1 ORDER BY "fecha" DESC`, [resolvedId]);
-      return { empresa, contactos, necesidades, ofertas, acciones, reuniones, totalInteracciones: contactos.length + necesidades.length + ofertas.length + acciones.length + reuniones.length };
-    }
+    case 'validarOportunidad': return validarOportunidadDB(args.oportunidadId, args.pedidosMes, args.puntoExigente, args.valorNomi, args.nivelInteres);
+    case 'activarOportunidad': return activarOportunidadDB(args.oportunidadId, args);
+    case 'obtenerFicha': return obtenerFichaEstablecimientoDB(args.establecimientoId);
+    case 'verPipeline': return getPipelineMetricsDB();
+    case 'verOportunidadesPorEtapa': return getOportunidadesPorEtapaDB(args.etapa);
+    case 'agregarSeguimiento': return userId ? guardarSeguimientoDB(args.oportunidadId, args.accion, userId, args.resultado) : { error: 'No autenticado' };
     default: return { error: `Unknown tool: ${name}` };
   }
 }
@@ -683,16 +449,13 @@ async function callGemini(contents: any[], userId?: string, maxSteps = 20): Prom
     const candidate = data.candidates[0].content;
     currentContents.push(candidate);
 
-    // Check if there are function calls
     const functionCalls = candidate.parts?.filter((p: any) => p.functionCall);
     
     if (!functionCalls || functionCalls.length === 0) {
-      // No tool calls — return text
       const text = candidate.parts?.map((p: any) => p.text).filter(Boolean).join('');
       return text || '';
     }
 
-    // Execute all function calls and add results
     const functionResponses: any[] = [];
     for (const part of functionCalls) {
       const { name, args } = part.functionCall;
@@ -706,7 +469,7 @@ async function callGemini(contents: any[], userId?: string, maxSteps = 20): Prom
       } catch (toolError: any) {
         console.error(`[Step ${step}] Tool ERROR: ${name} — ${toolError.message}`);
         functionResponses.push({
-          functionResponse: { name, response: { name, content: JSON.stringify({ error: toolError.message, tool: name }) } }
+          functionResponse: { name, response: { name, content: JSON.stringify({ error: toolError.message }) } }
         });
       }
     }
@@ -723,16 +486,12 @@ async function generateTitle(userMessage: string, assistantMessage: string): Pro
   const apiKey = process.env.GOOGLE_API_KEY;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-  const prompt = `Genera un título corto (máximo 50 caracteres) para esta conversación basado en el primer intercambio. Solo responde con el título, sin puntos ni comillas:
+  const prompt = `Genera un título corto (máximo 50 caracteres) para esta conversación de un CRM de restaurantes. Solo responde con el título, sin puntos ni comillas:
 
 Usuario: ${userMessage}
 Asistente: ${assistantMessage}
 
-Ejemplos de buenos títulos:
-- "Registro TechValle SAS"
-- "Métricas generales"
-- "Búsqueda sector agro"
-- "Contacto Carlos Mendoza"
+Ejemplos: "Registro La Parrilla Bogotá", "Pipeline de ventas", "Validación Hotel Marina"
 
 Título:`;
 
@@ -758,7 +517,6 @@ Título:`;
 
 export async function POST(req: Request) {
   try {
-    // Get the logged-in user
     const session = await getSession();
     if (!session) {
       return new Response(JSON.stringify({ error: 'No autenticado' }), {
@@ -768,11 +526,8 @@ export async function POST(req: Request) {
     }
 
     const { messages, conversationId } = await req.json();
-
-    // Get user message (last message in array)
     const userMessage = messages[messages.length - 1];
 
-    // Convert chat messages to Gemini format
     const contents: any[] = messages.map((m: any) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
@@ -780,40 +535,21 @@ export async function POST(req: Request) {
 
     const responseText = await callGemini(contents, session.id);
 
-    // Save messages to conversation if conversationId is provided
     if (conversationId) {
       try {
-        // Save user message
         await prisma.message.create({
-          data: {
-            conversationId,
-            role: 'user',
-            content: userMessage.content,
-          },
+          data: { conversationId, role: 'user', content: userMessage.content },
         });
-
-        // Save assistant message
         await prisma.message.create({
-          data: {
-            conversationId,
-            role: 'assistant',
-            content: responseText,
-          },
+          data: { conversationId, role: 'assistant', content: responseText },
         });
-
-        // Update lastMessageAt
         await prisma.conversation.update({
           where: { id: conversationId },
           data: { lastMessageAt: new Date() },
         });
 
-        // Generate title if this is the first exchange (2 messages total: user + assistant)
-        const messageCount = await prisma.message.count({
-          where: { conversationId },
-        });
-
+        const messageCount = await prisma.message.count({ where: { conversationId } });
         if (messageCount === 2) {
-          // Generate title based on first exchange
           const title = await generateTitle(userMessage.content, responseText);
           await prisma.conversation.update({
             where: { id: conversationId },
@@ -821,16 +557,12 @@ export async function POST(req: Request) {
           });
         }
       } catch (dbError) {
-        console.error('Error saving messages to conversation:', dbError);
-        // Continue even if DB save fails
+        console.error('Error saving messages:', dbError);
       }
     }
 
-    // Return plain text response (parsed by frontend ReadableStream reader)
     return new Response(responseText, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   } catch (error: any) {
     console.error('Chat API error:', error);

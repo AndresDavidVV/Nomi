@@ -139,7 +139,7 @@ export async function PATCH(req: Request) {
     const adminKey = url.searchParams.get('key');
 
     // Admin key is sufficient — no session needed
-    if (adminKey !== 'ccc-admin-2026-stats') {
+    if (adminKey !== 'nomi-admin-2026') {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },

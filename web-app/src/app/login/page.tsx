@@ -94,11 +94,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#233B85] to-[#6BBACB] flex items-center justify-center shadow-xl mb-4">
-            <img src="/ccc-logo.svg" alt="CCC" className="w-14 h-14" />
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#4A3F2F] to-[#7ED321] flex items-center justify-center shadow-xl mb-4">
+            <img src="/nomi-logo.png" alt="Nomi" className="w-14 h-14" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">Inteligencia Económica</h1>
-          <p className="text-sm text-slate-500">Cámara de Comercio de Cali</p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Nomi CRM</h1>
+          <p className="text-sm text-slate-500">Plataforma de Restaurantes</p>
         </div>
 
         {/* Card */}
@@ -114,7 +114,7 @@ export default function LoginPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+57 300 123 4567"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#233B85]/30 focus:border-[#233B85]"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A3F2F]/30 focus:border-[#4A3F2F]"
                   disabled={loading}
                   required
                 />
@@ -132,7 +132,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? 'Enviando...' : 'Enviar código por WhatsApp'}
               </button>
@@ -151,7 +151,7 @@ export default function LoginPage() {
                   onChange={(e) => setOtp(e.target.value)}
                   placeholder="123456"
                   maxLength={6}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-[#233B85]/30 focus:border-[#233B85]"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-[#4A3F2F]/30 focus:border-[#4A3F2F]"
                   disabled={loading}
                   required
                 />
@@ -174,7 +174,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? 'Verificando...' : 'Verificar código'}
               </button>
@@ -201,7 +201,7 @@ export default function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Juan Pérez"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#233B85]/30 focus:border-[#233B85]"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A3F2F]/30 focus:border-[#4A3F2F]"
                   disabled={loading}
                   required
                 />
@@ -219,7 +219,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? 'Guardando...' : 'Continuar'}
               </button>
@@ -231,7 +231,7 @@ export default function LoginPage() {
         <div className="mt-6 flex items-center justify-center gap-3 opacity-50">
           <img src="/lidarit-logo.png" alt="LiDARit" className="h-4 object-contain" />
           <span className="text-xs text-slate-400">×</span>
-          <img src="/ccc-logo.svg" alt="CCC" className="h-4 object-contain" />
+          <img src="/nomi-logo.png" alt="Nomi" className="h-4 object-contain" />
         </div>
       </div>
     </div>

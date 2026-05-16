@@ -24,9 +24,9 @@ interface Conversation {
 }
 
 const QUICK_ACTIONS = [
-  { label: '🏢 Registrar empresa', prompt: 'Quiero registrar una nueva empresa' },
-  { label: '🔍 Buscar empresa', prompt: 'Buscar una empresa en la base de datos' },
-  { label: '📋 Ver checklist', prompt: '¿Qué información necesito para completar una ficha de empresa?' },
+  { label: '🍽️ Registrar establecimiento', prompt: 'Quiero registrar un nuevo establecimiento' },
+  { label: '🔍 Buscar establecimiento', prompt: 'Buscar un establecimiento en la base de datos' },
+  { label: '📊 Ver pipeline', prompt: 'Muéstrame el pipeline de oportunidades' },
 ];
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -520,7 +520,7 @@ export default function Chat() {
       {/* Main Chat Area */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <header className="relative bg-gradient-to-r from-[#233B85] via-[#195A9D] to-[#233B85] text-white px-3 py-2.5 shadow-lg">
+        <header className="relative bg-gradient-to-r from-[#4A3F2F] via-[#5D4E37] to-[#4A3F2F] text-white px-3 py-2.5 shadow-lg">
           <div className="max-w-lg mx-auto flex items-center gap-2">
             {/* Hamburger Menu */}
             <button
@@ -535,13 +535,13 @@ export default function Chat() {
 
             {/* Logo + Title */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0">
-                <img src="/ccc-logo.svg" alt="CCC" className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img src="/nomi-logo.png" alt="Nomi" className="w-8 h-8 object-cover" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-semibold tracking-tight leading-tight truncate">Inteligencia Económica</h1>
-                <p className="text-[10px] text-blue-200 leading-tight">
-                  {user?.name ? `Hola, ${user.name}` : 'Cámara de Comercio de Cali'}
+                <h1 className="text-sm font-semibold tracking-tight leading-tight truncate">Nomi CRM</h1>
+                <p className="text-[10px] text-green-200 leading-tight">
+                  {user?.name ? `Hola, ${user.name}` : 'Plataforma de Restaurantes'}
                 </p>
               </div>
             </div>
@@ -564,19 +564,19 @@ export default function Chat() {
           <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
             {showWelcome && (
               <div className="flex flex-col items-center text-center pt-8 pb-4 animate-fadeIn">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#233B85] to-[#6BBACB] flex items-center justify-center shadow-xl mb-4">
-                  <img src="/ccc-logo.svg" alt="CCC" className="w-14 h-14" />
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#4A3F2F] to-[#7ED321] flex items-center justify-center shadow-xl mb-4">
+                  <img src="/nomi-logo.png" alt="Nomi" className="w-14 h-14" />
                 </div>
-                <h2 className="text-xl font-bold text-slate-800 mb-1">¡Bienvenido!</h2>
+                <h2 className="text-xl font-bold text-slate-800 mb-1">¡Bienvenido a Nomi!</h2>
                 <p className="text-sm text-slate-500 mb-6 max-w-xs">
-                  Soy tu Analista de Inteligencia Económica. Te ayudo a registrar empresas, necesidades y ofertas.
+                  Soy tu asistente de ventas. Te ayudo a descubrir, validar y activar oportunidades con establecimientos.
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {QUICK_ACTIONS.map((action) => (
                     <button
                       key={action.label}
                       onClick={() => sendMessage(action.prompt)}
-                      className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-[#233B85]/30 hover:text-[#233B85] transition-all shadow-sm active:scale-95"
+                      className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-[#4A3F2F]/30 hover:text-[#4A3F2F] transition-all shadow-sm active:scale-95"
                     >
                       {action.label}
                     </button>
@@ -588,13 +588,13 @@ export default function Chat() {
             {messages.map((m) => (
               <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-slideUp`}>
                 {m.role !== 'user' && (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#233B85] to-[#6BBACB] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md">
-                    <img src="/ccc-logo.svg" alt="" className="w-5 h-5" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4A3F2F] to-[#7ED321] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md">
+                    <img src="/nomi-logo.png" alt="" className="w-5 h-5" />
                   </div>
                 )}
                 <div className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed ${
                   m.role === 'user'
-                    ? 'bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white rounded-2xl rounded-br-md shadow-md'
+                    ? 'bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white rounded-2xl rounded-br-md shadow-md'
                     : 'bg-white text-slate-800 rounded-2xl rounded-bl-md shadow-sm border border-slate-100'
                 }`}>
                   <MessageContent content={m.content} />
@@ -604,8 +604,8 @@ export default function Chat() {
 
             {isLoading && messages[messages.length - 1]?.content === '' && (
               <div className="flex gap-2.5 animate-slideUp">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#233B85] to-[#6BBACB] flex items-center justify-center flex-shrink-0 shadow-md">
-                  <img src="/ccc-logo.svg" alt="" className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4A3F2F] to-[#7ED321] flex items-center justify-center flex-shrink-0 shadow-md">
+                  <img src="/nomi-logo.png" alt="" className="w-5 h-5" />
                 </div>
                 <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-slate-100">
                   <div className="flex gap-1.5">
@@ -653,7 +653,7 @@ export default function Chat() {
                   <button
                     type="button"
                     onClick={finishRecording}
-                    className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white shadow-lg hover:shadow-xl active:scale-95 transition-all"
+                    className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white shadow-lg hover:shadow-xl active:scale-95 transition-all"
                     title="Enviar audio"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3 21l18-9L3 3l3 9m0 0h12" /></svg>
@@ -674,7 +674,7 @@ export default function Chat() {
               <div className="flex items-end gap-2">
                 <div className="flex-1 relative">
                   <textarea
-                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-20 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#233B85]/30 focus:border-[#233B85]/50 transition-all max-h-32"
+                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-20 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4A3F2F]/30 focus:border-[#4A3F2F]/50 transition-all max-h-32"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -733,7 +733,7 @@ export default function Chat() {
                 <button
                   type="submit"
                   disabled={!input.trim() || isLoading || isProcessingImage}
-                  className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white shadow-lg disabled:opacity-40 disabled:shadow-none hover:shadow-xl active:scale-95 transition-all"
+                  className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white shadow-lg disabled:opacity-40 disabled:shadow-none hover:shadow-xl active:scale-95 transition-all"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3 21l18-9L3 3l3 9m0 0h12" /></svg>
                 </button>
@@ -804,7 +804,7 @@ export default function Chat() {
                       value={feedbackComment}
                       onChange={e => setFeedbackComment(e.target.value)}
                       placeholder="Cuéntanos más... (opcional)"
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#233B85]/30 resize-none"
+                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4A3F2F]/30 resize-none"
                       rows={3}
                     />
 
@@ -819,7 +819,7 @@ export default function Chat() {
                       <button
                         onClick={submitFeedback}
                         disabled={!feedbackRating || feedbackSending}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-br from-[#233B85] to-[#195A9D] text-white text-sm font-medium disabled:opacity-40 hover:shadow-lg active:scale-95 transition-all"
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-br from-[#4A3F2F] to-[#5D4E37] text-white text-sm font-medium disabled:opacity-40 hover:shadow-lg active:scale-95 transition-all"
                       >
                         {feedbackSending ? 'Enviando...' : 'Enviar'}
                       </button>
@@ -845,7 +845,7 @@ function MessageContent({ content }: { content: string }) {
         let html = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
         if (html.trim().startsWith('- ') || html.trim().startsWith('* ')) {
-          html = '<span class="inline-flex gap-1.5"><span class="text-[#6BBACB]">•</span><span>' + html.trim().slice(2) + '</span></span>';
+          html = '<span class="inline-flex gap-1.5"><span class="text-[#7ED321]">•</span><span>' + html.trim().slice(2) + '</span></span>';
         }
         return <p key={i} dangerouslySetInnerHTML={{ __html: html }} />;
       })}

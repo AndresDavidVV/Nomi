@@ -2,13 +2,13 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// PATCH /api/admin/feedback?key=ccc-admin-2026-stats - Update feedback status
+// PATCH /api/admin/feedback?key=nomi-admin-2026 - Update feedback status
 export async function PATCH(req: Request) {
   try {
     const url = new URL(req.url);
     const adminKey = url.searchParams.get('key');
 
-    if (adminKey !== 'ccc-admin-2026-stats') {
+    if (adminKey !== 'nomi-admin-2026') {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
@@ -52,13 +52,13 @@ export async function PATCH(req: Request) {
   }
 }
 
-// GET /api/admin/feedback?key=ccc-admin-2026-stats - List all feedback with status
+// GET /api/admin/feedback?key=nomi-admin-2026 - List all feedback with status
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const adminKey = url.searchParams.get('key');
 
-    if (adminKey !== 'ccc-admin-2026-stats') {
+    if (adminKey !== 'nomi-admin-2026') {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
